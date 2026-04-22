@@ -1,0 +1,10 @@
+import SwiftUI
+
+struct PressableRowStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.smooth(duration: 0.18), value: configuration.isPressed)
+            .contentShape(Rectangle())
+    }
+}

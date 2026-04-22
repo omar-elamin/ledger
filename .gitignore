@@ -1,0 +1,27 @@
+## Xcode
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+## Swift Package Manager
+.build/
+Packages/
+Package.pins
+Package.resolved
+.swiftpm/
+
+## macOS
+.DS_Store
+
+## Local secrets
+Ledger/Secrets.swift
+
+## xcodegen output (regenerate with `xcodegen generate`)
+Ledger.xcodeproj/
