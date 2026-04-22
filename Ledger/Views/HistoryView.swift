@@ -20,14 +20,6 @@ struct HistoryView: View {
         )
     }
 
-    private var totalDays: Int {
-        weeks.reduce(0) { $0 + $1.days.count }
-    }
-
-    private var isSparse: Bool {
-        totalDays <= 3
-    }
-
     var body: some View {
         ZStack {
             if weeks.isEmpty {
@@ -38,10 +30,6 @@ struct HistoryView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier("history.emptyState")
-            } else if isSparse {
-                weeksStack
-                    .padding(.horizontal, 24)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
                 ScrollView {
                     weeksStack
@@ -84,9 +72,7 @@ struct HistoryView: View {
                 }
             }
 
-            if !isSparse {
-                Spacer(minLength: 40)
-            }
+            Spacer(minLength: 40)
         }
     }
 

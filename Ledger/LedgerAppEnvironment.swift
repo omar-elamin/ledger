@@ -150,7 +150,7 @@ private actor ScriptedCoachClient: CoachStreamingClient {
         into continuation: AsyncThrowingStream<StreamEvent, Error>.Continuation
     ) async throws {
         for chunk in Self.textChunks(
-            "You're here. Good. What are we actually solving today?"
+            "You're here. Good. Tell me what's actually going on."
         ) {
             continuation.yield(.textDelta(chunk))
             try await Task.sleep(nanoseconds: 20_000_000)
@@ -173,7 +173,7 @@ private actor ScriptedCoachClient: CoachStreamingClient {
         await waitForToolResult(id: toolID)
 
         for chunk in Self.textChunks(
-            "Solid. That's roughly 1,200 cal and ~110g protein in the tank. Good protein floor for the day.\n\nWhat's the plan from here - training today, another meal, or just checking in?"
+            "Solid. That's roughly 1,200 cal and ~110g protein in the tank. Good protein floor for the day.\n\nThat gives you room later. Keep the rest of the day tight."
         ) {
             continuation.yield(.textDelta(chunk))
             try await Task.sleep(nanoseconds: 20_000_000)

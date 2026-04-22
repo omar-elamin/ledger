@@ -21,7 +21,7 @@ final class LedgerUITests: XCTestCase {
         send("Yo", in: app)
 
         XCTAssertTrue(
-            staticText(containing: "What are we actually solving today?", in: app)
+            staticText(containing: "Tell me what's actually going on.", in: app)
                 .waitForExistence(timeout: 5)
         )
     }

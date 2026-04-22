@@ -98,9 +98,12 @@ private struct TodayLogDayView: View {
         Group {
             if hasEntries {
                 if isSparse {
-                    contentStack
-                        .padding(.horizontal, 24)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    GeometryReader { geo in
+                        contentStack
+                            .padding(.horizontal, 24)
+                            .padding(.top, geo.size.height * 0.38)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    }
                 } else {
                     ScrollView {
                         contentStack

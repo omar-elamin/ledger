@@ -37,7 +37,7 @@ struct MessageBubble: View {
                         .transition(.opacity)
                 }
             }
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.82,
+            .frame(maxWidth: UIScreen.main.bounds.width * (isUser ? 0.55 : 0.82),
                    alignment: isUser ? .trailing : .leading)
 
             if !isUser { Spacer(minLength: 40) }
