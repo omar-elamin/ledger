@@ -8,6 +8,23 @@ enum TestHelpers {
         try LedgerPersistentModels.makeContainer(inMemory: true)
     }
 
+    static func makeLegacyInMemoryContainer() throws -> ModelContainer {
+        try LedgerPersistentModels.makeV1Container(inMemory: true)
+    }
+
+    static func makeTemporaryStoreURL(testName: String = UUID().uuidString) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LedgerTests", isDirectory: true)
+            .appendingPathComponent(testName, isDirectory: true)
+
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+
+        return directory.appendingPathComponent("ledger.sqlite")
+    }
+
     static func fetchAll<T: PersistentModel>(
         _ type: T.Type,
         from context: ModelContext

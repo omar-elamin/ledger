@@ -5,8 +5,7 @@ protocol CoachStreamingClient {
 
     func streamMessage(
         messages: [Message],
-        profile: String,
-        todayLog: DayLog?,
+        contextBlock: String,
         tools: [Tool]
     ) async -> AsyncThrowingStream<StreamEvent, Error>
 

@@ -77,8 +77,12 @@ final class ChatViewModel {
             return
         }
 
-        let profile = fetchProfileString(from: modelContext)
-        let todayLog = fetchTodayLog(from: modelContext)
+        let contextBlock = ContextBuilder(
+            modelContext: modelContext,
+            calendar: calendar,
+            now: now
+        )
+        .buildChatContext()
 
         isStreaming = true
         pendingToolNames.removeAll()
@@ -90,8 +94,7 @@ final class ChatViewModel {
         do {
             let stream = await claudeClient.streamMessage(
                 messages: messages,
-                profile: profile,
-                todayLog: todayLog,
+                contextBlock: contextBlock,
                 tools: CoachTools.all
             )
 
@@ -209,25 +212,46 @@ final class ChatViewModel {
             let payload = try decoder.decode(UpdateProfilePayload.self, from: data)
             try upsertProfileEntry(payload, in: modelContext)
             return "Profile updated."
+        case "search_archive":
+            let payload = try decoder.decode(SearchArchivePayload.self, from: data)
+            return try ContextBuilder(
+                modelContext: modelContext,
+                calendar: calendar,
+                now: now
+            )
+            .archiveSearchMarkdown(query: payload.query)
         default:
             throw ClaudeClientError.apiError("Unsupported tool \(name)")
         }
     }
 
     private func upsertProfileEntry(_ payload: UpdateProfilePayload, in modelContext: ModelContext) throws {
-        let key = payload.key
-        var descriptor = FetchDescriptor<ProfileEntry>(
-            predicate: #Predicate { entry in
-                entry.key == key
+        var descriptor = FetchDescriptor<IdentityProfile>(
+            predicate: #Predicate { profile in
+                profile.scope == "default"
             }
         )
         descriptor.fetchLimit = 1
 
         if let existing = try modelContext.fetch(descriptor).first {
-            existing.value = payload.value
-            existing.updatedAt = now()
+            existing.markdownContent = IdentityProfileDocument.upserting(
+                key: payload.key,
+                value: payload.value,
+                into: existing.markdownContent
+            )
+            existing.lastUpdated = now()
         } else {
-            modelContext.insert(ProfileEntry(key: payload.key, value: payload.value, updatedAt: now()))
+            modelContext.insert(
+                IdentityProfile(
+                    scope: IdentityProfile.defaultScope,
+                    markdownContent: IdentityProfileDocument.upserting(
+                        key: payload.key,
+                        value: payload.value,
+                        into: ""
+                    ),
+                    lastUpdated: now()
+                )
+            )
         }
 
         try modelContext.save()
@@ -284,114 +308,6 @@ final class ChatViewModel {
             messages.append(message)
         }
     }
-
-    private func fetchProfileString(from modelContext: ModelContext) -> String {
-        do {
-            let descriptor = FetchDescriptor<ProfileEntry>(
-                sortBy: [SortDescriptor(\.updatedAt, order: .forward)]
-            )
-            let entries = try modelContext.fetch(descriptor)
-
-            guard !entries.isEmpty else {
-                return "No saved profile yet."
-            }
-
-            return entries
-                .map { "\($0.key): \($0.value)" }
-                .joined(separator: "\n")
-        } catch {
-            print("Failed to fetch profile entries: \(error)")
-            return "No saved profile yet."
-        }
-    }
-
-    private func fetchTodayLog(from modelContext: ModelContext) -> DayLog? {
-        let bounds = dayBounds(for: now())
-        let start = bounds.start
-        let end = bounds.end
-
-        do {
-            let meals = try modelContext.fetch(
-                FetchDescriptor<StoredMeal>(
-                    predicate: #Predicate {
-                        $0.date >= start && $0.date < end
-                    },
-                    sortBy: [SortDescriptor(\.date, order: .forward)]
-                )
-            )
-            let workouts = try modelContext.fetch(
-                FetchDescriptor<StoredWorkoutSet>(
-                    predicate: #Predicate {
-                        $0.date >= start && $0.date < end
-                    },
-                    sortBy: [SortDescriptor(\.date, order: .forward)]
-                )
-            )
-            let metrics = try modelContext.fetch(
-                FetchDescriptor<StoredMetric>(
-                    predicate: #Predicate {
-                        $0.date >= start && $0.date < end
-                    },
-                    sortBy: [SortDescriptor(\.date, order: .forward)]
-                )
-            )
-
-            guard !meals.isEmpty || !workouts.isEmpty || !metrics.isEmpty else {
-                return nil
-            }
-
-            return DayLog(
-                date: now(),
-                calories: meals.reduce(0) { $0 + $1.calories },
-                protein: meals.reduce(0) { $0 + $1.protein },
-                eaten: meals.map(Self.mealLine),
-                trained: workouts.map(Self.workoutLine),
-                body: metrics.map(Self.metricLine),
-                summary: ""
-            )
-        } catch {
-            print("Failed to fetch today's log: \(error)")
-            return nil
-        }
-    }
-
-    private static func mealLine(_ meal: StoredMeal) -> String {
-        "\(meal.descriptionText) (~\(meal.calories) cal, \(meal.protein)g protein)"
-    }
-
-    private static func workoutLine(_ workout: StoredWorkoutSet) -> String {
-        if let notes = workout.notes, !notes.isEmpty {
-            return "\(workout.exercise)  \(workout.summary)  \(notes)"
-        }
-        return "\(workout.exercise)  \(workout.summary)"
-    }
-
-    private static func metricLine(_ metric: StoredMetric) -> String {
-        let type: String
-        switch metric.type.lowercased() {
-        case "hrv":
-            type = "HRV"
-        case "sleep":
-            type = "Sleep"
-        case "weight":
-            type = "Weight"
-        case "mood":
-            type = "Mood"
-        default:
-            type = metric.type.capitalized
-        }
-
-        if let context = metric.context, !context.isEmpty {
-            return "\(type) \(metric.value) \(context)"
-        }
-        return "\(type) \(metric.value)"
-    }
-
-    private func dayBounds(for date: Date) -> (start: Date, end: Date) {
-        let start = calendar.startOfDay(for: date)
-        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
-        return (start, end)
-    }
 }
 
 private struct UpdateMealLogPayload: Decodable {
@@ -421,6 +337,10 @@ private struct UpdateMetricPayload: Decodable {
 private struct UpdateProfilePayload: Decodable {
     let key: String
     let value: String
+}
+
+private struct SearchArchivePayload: Decodable {
+    let query: String
 }
 
 private extension StoredMessage {

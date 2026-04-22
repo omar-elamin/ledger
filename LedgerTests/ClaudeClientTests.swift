@@ -26,8 +26,7 @@ final class ClaudeClientTests: XCTestCase {
         let client = ClaudeClient(session: MockURLProtocol.makeSession())
         let stream = await client.streamMessage(
             messages: [Message(role: .user, content: "Hi", timestamp: Date())],
-            profile: "No saved profile yet.",
-            todayLog: nil,
+            contextBlock: "## Who this person is\nNo saved profile yet.",
             tools: CoachTools.all
         )
 
@@ -58,8 +57,7 @@ final class ClaudeClientTests: XCTestCase {
         let client = ClaudeClient(session: MockURLProtocol.makeSession())
         let stream = await client.streamMessage(
             messages: [Message(role: .user, content: "had chicken", timestamp: Date())],
-            profile: "No saved profile yet.",
-            todayLog: nil,
+            contextBlock: "## Who this person is\nNo saved profile yet.",
             tools: CoachTools.all
         )
 

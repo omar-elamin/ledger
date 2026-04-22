@@ -9,8 +9,7 @@ final class LedgerLiveAPITests: XCTestCase {
         let client = ClaudeClient()
         let stream = await client.streamMessage(
             messages: [Message(role: .user, content: "Hi", timestamp: Date())],
-            profile: "No saved profile yet.",
-            todayLog: nil,
+            contextBlock: "## Who this person is\nNo saved profile yet.",
             tools: CoachTools.all
         )
 
@@ -38,8 +37,7 @@ final class LedgerLiveAPITests: XCTestCase {
         let client = ClaudeClient()
         let stream = await client.streamMessage(
             messages: [Message(role: .user, content: "had 2 factor meals and 200g of chicken", timestamp: Date())],
-            profile: "No saved profile yet.",
-            todayLog: nil,
+            contextBlock: "## Who this person is\nNo saved profile yet.",
             tools: CoachTools.all
         )
 

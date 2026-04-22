@@ -7,11 +7,13 @@ struct ContentView: View {
     @State private var selectedTab: Int = 1
     @State private var dayAnchorController: DayAnchorController
     @State private var chatViewModel: ChatViewModel
+    @State private var memoryMaintenanceScheduler: MemoryMaintenanceScheduler
 
     init(appEnvironment: LedgerAppEnvironment = LedgerAppEnvironment.bootstrap()) {
         self.appEnvironment = appEnvironment
         _dayAnchorController = State(initialValue: appEnvironment.makeDayAnchorController())
         _chatViewModel = State(initialValue: appEnvironment.makeChatViewModel())
+        _memoryMaintenanceScheduler = State(initialValue: appEnvironment.memoryMaintenanceScheduler)
     }
 
     var body: some View {
@@ -28,9 +30,11 @@ struct ContentView: View {
         .background(Color.ledgerBg)
         .onAppear {
             dayAnchorController.handleScenePhaseChange(scenePhase)
+            memoryMaintenanceScheduler.handleScenePhaseChange(scenePhase)
         }
         .onChange(of: scenePhase) { _, newValue in
             dayAnchorController.handleScenePhaseChange(newValue)
+            memoryMaintenanceScheduler.handleScenePhaseChange(newValue)
         }
     }
 }

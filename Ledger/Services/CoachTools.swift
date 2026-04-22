@@ -120,6 +120,23 @@ enum CoachTools {
                 ])
             ]),
             eagerInputStreaming: true
+        ),
+        Tool(
+            name: "search_archive",
+            description: "Search older weekly and monthly summaries when the user asks about historical periods that are no longer in the loaded context.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "query": .object([
+                        "type": .string("string"),
+                        "description": .string("The historical topic or phrase to search for, e.g. 'last month', 'travel week', 'drinking'")
+                    ])
+                ]),
+                "required": .array([
+                    .string("query")
+                ])
+            ]),
+            eagerInputStreaming: true
         )
     ]
 }

@@ -18,15 +18,13 @@ actor StubStreamingClient: CoachStreamingClient {
 
     func streamMessage(
         messages: [Message],
-        profile: String,
-        todayLog: DayLog?,
+        contextBlock: String,
         tools: [Tool]
     ) async -> AsyncThrowingStream<StreamEvent, Error> {
         invocations.append(
             Invocation(
                 messages: messages,
-                profile: profile,
-                todayLog: todayLog,
+                contextBlock: contextBlock,
                 tools: tools
             )
         )
@@ -64,6 +62,14 @@ actor StubStreamingClient: CoachStreamingClient {
     func completedToolUseCount() -> Int {
         completedToolUses.count
     }
+
+    func invocationsSnapshot() -> [Invocation] {
+        invocations
+    }
+
+    func completedToolUsesSnapshot() -> [CompletedToolUse] {
+        completedToolUses
+    }
 }
 
 extension StubStreamingClient {
@@ -74,8 +80,7 @@ extension StubStreamingClient {
 
     struct Invocation {
         let messages: [Message]
-        let profile: String
-        let todayLog: DayLog?
+        let contextBlock: String
         let tools: [Tool]
     }
 

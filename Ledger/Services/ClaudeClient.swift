@@ -63,6 +63,16 @@ struct ToolExecutionResult: Sendable {
     let isError: Bool
 }
 
+protocol MemoryTextGeneratingClient: Sendable {
+    var hasAPIKeyConfigured: Bool { get }
+
+    func generateText(
+        systemPrompt: String,
+        userPrompt: String,
+        maxTokens: Int
+    ) async throws -> String
+}
+
 enum ClaudeClientError: LocalizedError {
     case invalidResponse
     case apiError(String)
@@ -83,7 +93,7 @@ enum ClaudeClientError: LocalizedError {
     }
 }
 
-actor ClaudeClient: CoachStreamingClient {
+actor ClaudeClient: CoachStreamingClient, MemoryTextGeneratingClient {
     static let model = "claude-opus-4-7"
 
     private let session: URLSession
@@ -100,15 +110,10 @@ actor ClaudeClient: CoachStreamingClient {
 
     func streamMessage(
         messages: [Message],
-        profile: String,
-        todayLog: DayLog?,
+        contextBlock: String,
         tools: [Tool]
     ) async -> AsyncThrowingStream<StreamEvent, Error> {
-        let systemPrompt = CoachPrompt.systemPrompt(
-            profile: profile,
-            weeklyContext: "",
-            todayLog: Self.render(todayLog: todayLog)
-        )
+        let systemPrompt = CoachPrompt.systemPrompt(contextBlock: contextBlock)
         let initialMessages = messages.map { APIMessage(message: $0) }
 
         return AsyncThrowingStream { continuation in
@@ -126,6 +131,49 @@ actor ClaudeClient: CoachStreamingClient {
                 }
             }
         }
+    }
+
+    func generateText(
+        systemPrompt: String,
+        userPrompt: String,
+        maxTokens: Int = 1024
+    ) async throws -> String {
+        let requestBody = MessagesRequest(
+            model: Self.model,
+            system: systemPrompt,
+            maxTokens: maxTokens,
+            stream: false,
+            messages: [
+                APIMessage(
+                    role: "user",
+                    content: [.text(userPrompt)]
+                )
+            ],
+            tools: []
+        )
+
+        let request = try makeRequest(for: requestBody)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ClaudeClientError.invalidResponse
+        }
+
+        guard (200 ..< 300).contains(httpResponse.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? "Unknown API error."
+            throw ClaudeClientError.apiError(Self.extractAPIError(from: body))
+        }
+
+        let message = try JSONDecoder().decode(ClaudeMessageResponse.self, from: data)
+        let text = message.content
+            .compactMap(\.text)
+            .joined()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !text.isEmpty else {
+            throw ClaudeClientError.invalidResponse
+        }
+
+        return text
     }
 
     func completeToolUse(id: String, content: String, isError: Bool = false) async {
@@ -200,12 +248,7 @@ actor ClaudeClient: CoachStreamingClient {
             tools: tools
         )
 
-        var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
-        request.httpMethod = "POST"
-        request.setValue(Secrets.anthropicAPIKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
-        request.httpBody = try JSONEncoder().encode(requestBody)
+        let request = try makeRequest(for: requestBody)
 
         let (bytes, response) = try await session.bytes(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -270,29 +313,14 @@ actor ClaudeClient: CoachStreamingClient {
         return payload.error.message
     }
 
-    private static func render(todayLog: DayLog?) -> String {
-        guard let todayLog else {
-            return "Nothing logged yet today."
-        }
-
-        var sections: [String] = [
-            "Calories so far: \(todayLog.calories)",
-            "Protein so far: \(todayLog.protein)g"
-        ]
-
-        if !todayLog.eaten.isEmpty {
-            sections.append("Eaten: " + todayLog.eaten.joined(separator: " | "))
-        }
-
-        if !todayLog.trained.isEmpty {
-            sections.append("Trained: " + todayLog.trained.joined(separator: " | "))
-        }
-
-        if !todayLog.body.isEmpty {
-            sections.append("Body: " + todayLog.body.joined(separator: " | "))
-        }
-
-        return sections.joined(separator: "\n")
+    private func makeRequest(for requestBody: MessagesRequest) throws -> URLRequest {
+        var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+        request.httpMethod = "POST"
+        request.setValue(Secrets.anthropicAPIKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.httpBody = try JSONEncoder().encode(requestBody)
+        return request
     }
 }
 
@@ -543,6 +571,15 @@ struct TopLevelAPIError: Decodable {
 struct APIErrorPayload: Decodable {
     let type: String
     let message: String
+}
+
+struct ClaudeMessageResponse: Decodable {
+    let content: [ClaudeMessageContent]
+}
+
+struct ClaudeMessageContent: Decodable {
+    let type: String
+    let text: String?
 }
 
 private extension Array {

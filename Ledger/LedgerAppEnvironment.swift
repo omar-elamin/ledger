@@ -3,6 +3,7 @@ import SwiftData
 
 struct LedgerAppEnvironment {
     let modelContainer: ModelContainer
+    let memoryMaintenanceScheduler: MemoryMaintenanceScheduler
     let makeChatViewModel: @MainActor () -> ChatViewModel
     let makeDayAnchorController: @MainActor () -> DayAnchorController
 
@@ -11,12 +12,45 @@ struct LedgerAppEnvironment {
         let calendar = Calendar.autoupdatingCurrent
         let modelContainer = Self.makeModelContainer(storeURL: launchConfiguration.storeURL)
         let now = launchConfiguration.nowProvider
-        let streamingClient: any CoachStreamingClient = launchConfiguration.testScenario.map {
-            ScriptedCoachClient(scenario: $0)
-        } ?? ClaudeClient()
+        Self.runDevelopmentSeedIfNeeded(
+            seed: launchConfiguration.developmentSeed,
+            in: modelContainer,
+            calendar: calendar,
+            now: now()
+        )
+        let streamingClient: any CoachStreamingClient
+        let memoryTextGenerator: any MemoryTextGeneratingClient
+
+        if let scenario = launchConfiguration.testScenario {
+            streamingClient = ScriptedCoachClient(scenario: scenario)
+            memoryTextGenerator = DisabledMemoryTextGenerator()
+        } else {
+            let claudeClient = ClaudeClient()
+            streamingClient = claudeClient
+            memoryTextGenerator = claudeClient
+        }
+
+        let maintainer = MemoryMaintainer(
+            modelContainer: modelContainer,
+            textGenerator: memoryTextGenerator,
+            calendar: calendar,
+            now: now
+        )
+        let memoryCoordinator = MemoryMaintenanceCoordinator(
+            maintainer: maintainer,
+            textGenerator: memoryTextGenerator,
+            calendar: calendar,
+            now: now
+        )
+        let memoryScheduler = MemoryMaintenanceScheduler(
+            coordinator: memoryCoordinator,
+            calendar: calendar,
+            now: now
+        )
 
         return LedgerAppEnvironment(
             modelContainer: modelContainer,
+            memoryMaintenanceScheduler: memoryScheduler,
             makeChatViewModel: {
                 ChatViewModel(
                     claudeClient: streamingClient,
@@ -50,10 +84,36 @@ struct LedgerAppEnvironment {
             fatalError("Failed to create model container: \(error)")
         }
     }
+
+    private static func runDevelopmentSeedIfNeeded(
+        seed: LedgerDevelopmentSeed?,
+        in modelContainer: ModelContainer,
+        calendar: Calendar,
+        now: Date
+    ) {
+        guard let seed else { return }
+
+        do {
+            switch seed {
+            case .historyPreview:
+                let didSeed = try HistoryPreviewSeeder.seedIfNeeded(
+                    in: modelContainer,
+                    calendar: calendar,
+                    now: now
+                )
+                if didSeed {
+                    print("Seeded history preview data into the local store.")
+                }
+            }
+        } catch {
+            print("Failed to seed development data: \(error)")
+        }
+    }
 }
 
 private struct LedgerLaunchConfiguration {
     let testScenario: LedgerUITestScenario?
+    let developmentSeed: LedgerDevelopmentSeed?
     let storeURL: URL?
     let nowProvider: @Sendable () -> Date
 
@@ -63,6 +123,9 @@ private struct LedgerLaunchConfiguration {
         self.testScenario = isUITestMode
             ? LedgerUITestScenario(rawValue: environment["LEDGER_TEST_SCENARIO"] ?? "") ?? .happyPath
             : nil
+        self.developmentSeed = LedgerDevelopmentSeed(
+            rawValue: environment["LEDGER_DEV_SEED_PRESET"] ?? ""
+        )
         self.storeURL = environment["LEDGER_TEST_STORE_PATH"].flatMap {
             guard !$0.isEmpty else { return nil }
             return URL(fileURLWithPath: $0)
@@ -109,8 +172,7 @@ private actor ScriptedCoachClient: CoachStreamingClient {
 
     func streamMessage(
         messages: [Message],
-        profile: String,
-        todayLog: DayLog?,
+        contextBlock: String,
         tools: [Tool]
     ) async -> AsyncThrowingStream<StreamEvent, Error> {
         let latestUserText = messages.last(where: { $0.role == .user })?.content.lowercased() ?? ""
