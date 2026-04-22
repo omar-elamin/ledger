@@ -64,9 +64,8 @@ The live suite skips unless both `LEDGER_RUN_LIVE_API_TESTS=1` and a non-empty
 
 ## License
 
-Ledger is licensed under `FSL-1.1-ALv2`. Each version converts to Apache 2.0
-on the second anniversary of the date that version is made available. See
-`LICENSE` for the full terms.
+Ledger is licensed under the GNU General Public License v2.0. See `LICENSE`
+for the full terms.
 
 ### First-time Xcode setup
 
