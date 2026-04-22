@@ -33,10 +33,11 @@ jobs:
       - name: Resolve Simulator
         id: simulator
         run: |
-          DEVICE_ID=$(xcrun simctl list devices available | awk -F '[()]' '
-            /iPhone .*Booted/ { print $(NF-1); exit }
-            /iPhone .*Shutdown/ { print $(NF-1); exit }
-          ')
+          DEVICE_ID=$(
+            xcrun simctl list devices available |
+            sed -nE '/iPhone/s/.*\(([0-9A-Fa-f-]{36})\) \((Booted|Shutdown)\)[[:space:]]*$/\1/p' |
+            head -n 1
+          )
 
           if [ -z "$DEVICE_ID" ]; then
             echo "No available iPhone simulator found." >&2

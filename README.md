@@ -33,10 +33,11 @@ falls back to the missing-key message.
 Resolve a simulator once per shell:
 
 ```bash
-DEVICE_ID=$(xcrun simctl list devices available | awk -F '[()]' '
-  /iPhone .*Booted/ { print $(NF-1); exit }
-  /iPhone .*Shutdown/ { print $(NF-1); exit }
-')
+DEVICE_ID=$(
+  xcrun simctl list devices available |
+  sed -nE '/iPhone/s/.*\(([0-9A-Fa-f-]{36})\) \((Booted|Shutdown)\)[[:space:]]*$/\1/p' |
+  head -n 1
+)
 ```
 
 Run the deterministic unit/integration + UI suite:
@@ -64,8 +65,8 @@ The live suite skips unless both `LEDGER_RUN_LIVE_API_TESTS=1` and a non-empty
 
 ## License
 
-Ledger is licensed under the GNU General Public License v2.0. See `LICENSE`
-for the full terms.
+Ledger is licensed under the GNU Affero General Public License v3.0. See
+`LICENSE` for the full terms.
 
 ### First-time Xcode setup
 
