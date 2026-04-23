@@ -17,6 +17,10 @@ enum TestHelpers {
             .appendingPathComponent("LedgerTests", isDirectory: true)
             .appendingPathComponent(testName, isDirectory: true)
 
+        if FileManager.default.fileExists(atPath: directory.path) {
+            try FileManager.default.removeItem(at: directory)
+        }
+
         try FileManager.default.createDirectory(
             at: directory,
             withIntermediateDirectories: true
@@ -38,6 +42,33 @@ enum TestHelpers {
                 sortBy: [SortDescriptor(\.timestamp, order: .forward)]
             )
         )
+    }
+
+    static func makeUTCCalendar() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        return calendar
+    }
+
+    static func makeDate(
+        year: Int,
+        month: Int,
+        day: Int,
+        hour: Int = 0,
+        minute: Int = 0,
+        calendar: Calendar
+    ) -> Date {
+        calendar.date(
+            from: DateComponents(
+                calendar: calendar,
+                timeZone: calendar.timeZone,
+                year: year,
+                month: month,
+                day: day,
+                hour: hour,
+                minute: minute
+            )
+        )!
     }
 }
 

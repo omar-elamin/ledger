@@ -3,6 +3,41 @@ import XCTest
 @testable import Ledger
 
 final class LedgerPersistentModelsTests: XCTestCase {
+    func testRecoversLegacyStoreIntoCurrentSchema() throws {
+        let storeURL = try TestHelpers.makeTemporaryStoreURL(testName: #function)
+
+        do {
+            let legacyContainer = try LedgerPersistentModels.makeLegacyContainer(url: storeURL)
+            let legacyContext = ModelContext(legacyContainer)
+            legacyContext.insert(
+                LegacyLedgerSchema.StoredMessage(
+                    role: "coach",
+                    content: "Legacy opener",
+                    timestamp: Date(timeIntervalSince1970: 1_777_777_200)
+                )
+            )
+            legacyContext.insert(
+                LegacyLedgerSchema.ProfileEntry(
+                    key: "goal_weight",
+                    value: "78kg",
+                    updatedAt: Date(timeIntervalSince1970: 1_777_777_300)
+                )
+            )
+            try legacyContext.save()
+        }
+
+        let migratedContainer = try LedgerPersistentModels.makeContainer(url: storeURL)
+        let migratedContext = ModelContext(migratedContainer)
+
+        let messages = try migratedContext.fetch(FetchDescriptor<StoredMessage>())
+        let profiles = try migratedContext.fetch(FetchDescriptor<IdentityProfile>())
+
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages.first?.content, "Legacy opener")
+        XCTAssertEqual(profiles.count, 1)
+        XCTAssertTrue(profiles.first?.markdownContent.contains("- goal_weight: 78kg") == true)
+    }
+
     func testMigratesLegacyProfileEntriesIntoIdentityProfile() throws {
         let storeURL = try TestHelpers.makeTemporaryStoreURL(testName: #function)
 
