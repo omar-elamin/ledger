@@ -24,7 +24,7 @@ enum CoachTools {
                 "properties": .object([
                     "description": .object([
                         "type": .string("string"),
-                        "description": .string("Brief description of what was eaten, e.g. '2 Factor meals' or '8 cigköfte with lettuce'")
+                        "description": .string("Brief description of what was eaten, using the user's own words. Do not add modifiers the user did not say (e.g. 'veggie', 'grilled', 'low-fat'). If a modifier matters and the user did not state it, do not fire this tool — ask first.")
                     ]),
                     "estimated_calories": .object([
                         "type": .string("integer")
@@ -58,7 +58,7 @@ enum CoachTools {
                     ]),
                     "summary": .object([
                         "type": .string("string"),
-                        "description": .string("Formatted summary, e.g. '3×6 @ 50kg' or '3 sets → 60kg×8'")
+                        "description": .string("Formatted summary, e.g. '3×6 @ 50kg' or '3 sets → 60kg×8'. Use the user's own words for exercise, sets, reps, and weight. Do not infer weights or counts the user did not state.")
                     ]),
                     "notes": .object([
                         "type": .string("string"),
@@ -95,7 +95,7 @@ enum CoachTools {
                     ]),
                     "value": .object([
                         "type": .string("string"),
-                        "description": .string("The value, e.g. '24', '7h 12m', '82.5kg'")
+                        "description": .string("The value, e.g. '24', '7h 12m', '82.5kg'. Must appear in the current user message. Do not infer metric values from context or prior readings.")
                     ]),
                     "context": .object([
                         "type": .string("string"),

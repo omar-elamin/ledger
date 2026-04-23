@@ -41,6 +41,20 @@ final class CoachPromptTests: XCTestCase {
         XCTAssertTrue(prompt.contains("A day with no logged workouts because the user skipped"))
     }
 
+    func testPromptIncludesResolvingContradictionsSubsection() {
+        let prompt = CoachPrompt.systemPrompt(
+            contextBlock: """
+            ## Who this person is
+            ## Goals
+            - goal_weight: 78kg
+            """
+        )
+
+        XCTAssertTrue(prompt.contains("## Resolving contradictions"))
+        XCTAssertTrue(prompt.contains(#""Regular or veggie?""#))
+        XCTAssertTrue(prompt.contains("not substitutes for the user's own words"))
+    }
+
     func testPromptInjectsFirstConversationSectionWhenIdentityIsPlaceholder() {
         let prompt = CoachPrompt.systemPrompt(
             contextBlock: """
