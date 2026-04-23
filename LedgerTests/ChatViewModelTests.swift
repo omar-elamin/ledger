@@ -338,6 +338,35 @@ final class ChatViewModelTests: XCTestCase {
         )
     }
 
+    func testStripsEchoedTimestampPrefixFromCoachReply() async throws {
+        let container = try TestHelpers.makeInMemoryContainer()
+        let context = ModelContext(container)
+        let client = StubStreamingClient(
+            scripts: [.events([.textDelta("[Apr 23, 21:16] Got it."), .messageStop])]
+        )
+        let viewModel = ChatViewModel(
+            claudeClient: client,
+            now: { Date(timeIntervalSince1970: 1_700_000_000) }
+        )
+        viewModel.loadInitialMessages(from: context)
+
+        viewModel.send("hello", modelContext: context)
+        await waitUntil {
+            viewModel.messages.count == 3 && !viewModel.isStreaming
+        }
+
+        XCTAssertEqual(viewModel.messages.last?.content, "Got it.")
+        let stored = try TestHelpers.fetchMessages(from: context)
+        XCTAssertTrue(
+            stored.contains(where: { $0.content == "Got it." }),
+            "expected timestamp prefix stripped from stored coach message"
+        )
+        XCTAssertFalse(
+            stored.contains(where: { $0.content.hasPrefix("[Apr") }),
+            "no stored coach message should keep the echoed timestamp"
+        )
+    }
+
     func testAppendsFallbackWhenStreamingFails() async throws {
         let container = try TestHelpers.makeInMemoryContainer()
         let context = ModelContext(container)

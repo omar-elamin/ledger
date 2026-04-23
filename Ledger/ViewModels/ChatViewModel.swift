@@ -128,6 +128,9 @@ final class ChatViewModel {
             } else {
                 streamingMessage?.content += delta
             }
+            if let current = streamingMessage?.content {
+                streamingMessage?.content = Self.stripTimestampPrefix(current)
+            }
         case .toolUseStart(let id, let name):
             pendingToolNames[id] = name
             pendingToolJSON[id] = ""
@@ -304,7 +307,13 @@ final class ChatViewModel {
             isStreaming = false
         }
 
-        guard let streamingMessage, !streamingMessage.content.isEmpty else {
+        guard var streamingMessage, !streamingMessage.content.isEmpty else {
+            self.streamingMessage = nil
+            return
+        }
+
+        streamingMessage.content = Self.stripTimestampPrefix(streamingMessage.content)
+        guard !streamingMessage.content.isEmpty else {
             self.streamingMessage = nil
             return
         }
@@ -344,6 +353,17 @@ final class ChatViewModel {
         copy.content = "[\(messageTimestampFormatter.string(from: message.timestamp))] \(message.content)"
         return copy
     }
+
+    // The model occasionally echoes the injected `[MMM d, HH:mm]` prefix at the
+    // start of its own reply. Keep the prefix out of whatever the user sees.
+    private static func stripTimestampPrefix(_ content: String) -> String {
+        guard let match = content.firstMatch(of: timestampPrefixRegex), match.range.lowerBound == content.startIndex else {
+            return content
+        }
+        return String(content[match.range.upperBound...])
+    }
+
+    private static let timestampPrefixRegex = /\A\[[A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d{2}\]\s*/
 
     private static let messageTimestampFormatter: DateFormatter = {
         let formatter = DateFormatter()
