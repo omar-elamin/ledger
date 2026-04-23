@@ -82,6 +82,125 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertEqual(try TestHelpers.fetchMessages(from: context).last?.content, "Hey there")
     }
 
+    func testShowsTransientThinkingStatusWhileWaitingForFirstVisibleOutput() async throws {
+        let container = try TestHelpers.makeInMemoryContainer()
+        let context = ModelContext(container)
+        let client = StubStreamingClient(
+            scripts: [
+                .delayedEvents(
+                    [.messageStop],
+                    initialDelayNanoseconds: 200_000_000,
+                    eventDelayNanoseconds: 0
+                )
+            ]
+        )
+        let viewModel = ChatViewModel(claudeClient: client)
+        viewModel.loadInitialMessages(from: context)
+
+        viewModel.send("Hi", modelContext: context)
+        await waitUntil {
+            viewModel.isStreaming && viewModel.activityStatus == "Thinking..."
+        }
+
+        XCTAssertEqual(try TestHelpers.fetchMessages(from: context).map(\.content), [
+            "Hi. What should I call you?",
+            "Hi"
+        ])
+
+        await waitUntil {
+            !viewModel.isStreaming
+        }
+
+        XCTAssertNil(viewModel.activityStatus)
+        XCTAssertEqual(try TestHelpers.fetchMessages(from: context).map(\.content), [
+            "Hi. What should I call you?",
+            "Hi"
+        ])
+    }
+
+    func testShowsWriteToolStatusThenClearsOnVisibleText() async throws {
+        let container = try TestHelpers.makeInMemoryContainer()
+        let context = ModelContext(container)
+        let client = StubStreamingClient(
+            scripts: [
+                .delayedEvents(
+                    [
+                        .toolUseStart(id: "meal", name: "update_meal_log"),
+                        .toolUseDelta(
+                            id: "meal",
+                            partialJSON: #"{"description":"Chicken","estimated_calories":300,"estimated_protein_grams":50,"evidence":"Log this chicken"}"#
+                        ),
+                        .toolUseEnd(id: "meal"),
+                        .textDelta("Logged."),
+                        .messageStop
+                    ],
+                    initialDelayNanoseconds: 100_000_000,
+                    eventDelayNanoseconds: 200_000_000
+                )
+            ]
+        )
+        let viewModel = ChatViewModel(claudeClient: client)
+        viewModel.loadInitialMessages(from: context)
+
+        viewModel.send("Log this chicken", modelContext: context)
+        await waitUntil {
+            viewModel.activityStatus == "Thinking..."
+        }
+        await waitUntil {
+            viewModel.activityStatus == "Writing that down..."
+        }
+        await waitUntil {
+            viewModel.activityStatus == "Thinking..."
+        }
+        await waitUntil {
+            viewModel.activityStatus == nil && viewModel.streamingMessage?.content == "Logged."
+        }
+        await waitUntil {
+            !viewModel.isStreaming
+        }
+
+        XCTAssertEqual(viewModel.messages.last?.content, "Logged.")
+        XCTAssertFalse(try TestHelpers.fetchMessages(from: context).contains { storedMessage in
+            ["Thinking...", "Writing that down..."].contains(storedMessage.content)
+        })
+    }
+
+    func testShowsMemoryStatusForArchiveSearch() async throws {
+        let container = try TestHelpers.makeInMemoryContainer()
+        let context = ModelContext(container)
+        let client = StubStreamingClient(
+            scripts: [
+                .delayedEvents(
+                    [
+                        .toolUseStart(id: "archive", name: "search_archive"),
+                        .toolUseDelta(id: "archive", partialJSON: #"{"query":"travel"}"#),
+                        .toolUseEnd(id: "archive"),
+                        .textDelta("I checked."),
+                        .messageStop
+                    ],
+                    initialDelayNanoseconds: 100_000_000,
+                    eventDelayNanoseconds: 200_000_000
+                )
+            ]
+        )
+        let viewModel = ChatViewModel(claudeClient: client)
+        viewModel.loadInitialMessages(from: context)
+
+        viewModel.send("How was travel?", modelContext: context)
+        await waitUntil {
+            viewModel.activityStatus == "Checking memory..."
+        }
+        await waitUntil {
+            viewModel.activityStatus == "Thinking..."
+        }
+        await waitUntil {
+            !viewModel.isStreaming
+        }
+
+        XCTAssertNil(viewModel.activityStatus)
+        XCTAssertEqual(viewModel.messages.last?.content, "I checked.")
+    }
+
     func testPersistsStructuredToolOutputs() async throws {
         let container = try TestHelpers.makeInMemoryContainer()
         let context = ModelContext(container)

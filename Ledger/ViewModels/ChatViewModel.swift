@@ -9,6 +9,7 @@ final class ChatViewModel {
     var messages: [Message] = []
     var isStreaming = false
     var streamingMessage: Message?
+    var activityStatus: String?
 
     private let claudeClient: any CoachStreamingClient
     private let calendar: Calendar
@@ -92,6 +93,7 @@ final class ChatViewModel {
         pendingToolJSON.removeAll()
         withAnimation(.smooth(duration: 0.3)) {
             streamingMessage = Message(role: .coach, content: "", timestamp: now())
+            activityStatus = ChatActivityStatus.thinking
         }
 
         do {
@@ -119,6 +121,8 @@ final class ChatViewModel {
     private func handleStreamEvent(_ event: StreamEvent, modelContext: ModelContext) async {
         switch event {
         case .textDelta(let delta):
+            guard !delta.isEmpty else { return }
+            activityStatus = nil
             if streamingMessage == nil {
                 streamingMessage = Message(role: .coach, content: delta, timestamp: now())
             } else {
@@ -127,6 +131,7 @@ final class ChatViewModel {
         case .toolUseStart(let id, let name):
             pendingToolNames[id] = name
             pendingToolJSON[id] = ""
+            activityStatus = ChatActivityStatus.status(forToolName: name)
         case .toolUseDelta(let id, let partialJSON):
             pendingToolJSON[id, default: ""] += partialJSON
         case .toolUseEnd(let id):
@@ -143,6 +148,7 @@ final class ChatViewModel {
                 content: "Tool metadata was missing.",
                 isError: true
             )
+            activityStatus = ChatActivityStatus.thinking
             pendingToolJSON.removeValue(forKey: id)
             return
         }
@@ -156,6 +162,7 @@ final class ChatViewModel {
                 modelContext: modelContext
             )
             await claudeClient.completeToolUse(id: id, content: resultMessage, isError: false)
+            activityStatus = ChatActivityStatus.thinking
         } catch {
             print("Failed to persist tool use \(toolName): \(error)")
             await claudeClient.completeToolUse(
@@ -163,6 +170,7 @@ final class ChatViewModel {
                 content: "Failed to persist \(toolName).",
                 isError: true
             )
+            activityStatus = ChatActivityStatus.thinking
         }
     }
 
@@ -292,6 +300,7 @@ final class ChatViewModel {
         defer {
             pendingToolNames.removeAll()
             pendingToolJSON.removeAll()
+            activityStatus = nil
             isStreaming = false
         }
 
@@ -316,6 +325,7 @@ final class ChatViewModel {
     private func clearStreamingState() {
         withAnimation(.smooth(duration: 0.2)) {
             streamingMessage = nil
+            activityStatus = nil
         }
         pendingToolNames.removeAll()
         pendingToolJSON.removeAll()
@@ -354,6 +364,23 @@ final class ChatViewModel {
 
         withAnimation(.smooth(duration: 0.3)) {
             messages.append(message)
+        }
+    }
+}
+
+private enum ChatActivityStatus {
+    static let thinking = "Thinking..."
+    static let writing = "Writing that down..."
+    static let checkingMemory = "Checking memory..."
+
+    static func status(forToolName toolName: String) -> String {
+        switch toolName {
+        case "search_archive":
+            return checkingMemory
+        case "update_meal_log", "record_workout_set", "update_metric", "update_identity_fact":
+            return writing
+        default:
+            return thinking
         }
     }
 }

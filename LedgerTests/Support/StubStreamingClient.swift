@@ -40,6 +40,21 @@ actor StubStreamingClient: CoachStreamingClient {
                     continuation.finish()
                 }
             }
+        case .delayedEvents(let events, let initialDelayNanoseconds, let eventDelayNanoseconds):
+            return AsyncThrowingStream { continuation in
+                Task {
+                    if initialDelayNanoseconds > 0 {
+                        try? await Task.sleep(nanoseconds: initialDelayNanoseconds)
+                    }
+                    for event in events {
+                        continuation.yield(event)
+                        if eventDelayNanoseconds > 0 {
+                            try? await Task.sleep(nanoseconds: eventDelayNanoseconds)
+                        }
+                    }
+                    continuation.finish()
+                }
+            }
         case .error(let error):
             return AsyncThrowingStream { continuation in
                 Task {
@@ -75,6 +90,11 @@ actor StubStreamingClient: CoachStreamingClient {
 extension StubStreamingClient {
     enum Script {
         case events([StreamEvent])
+        case delayedEvents(
+            [StreamEvent],
+            initialDelayNanoseconds: UInt64,
+            eventDelayNanoseconds: UInt64
+        )
         case error(Error)
     }
 

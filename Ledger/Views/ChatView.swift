@@ -30,12 +30,24 @@ struct ChatView: View {
                             )
                         )
                     }
-                    if let streamingMessage = viewModel.streamingMessage {
-                        MessageBubble(
-                            message: streamingMessage,
-                            isClusterStart: isStreamingClusterStart(role: streamingMessage.role)
-                        )
-                        .id(streamingMessage.id)
+                    if shouldShowStreamingResponse {
+                        VStack(alignment: .leading, spacing: 0) {
+                            if let streamingMessage = viewModel.streamingMessage,
+                               !streamingMessage.content.isEmpty {
+                                MessageBubble(
+                                    message: streamingMessage,
+                                    isClusterStart: isStreamingClusterStart(role: streamingMessage.role)
+                                )
+                            }
+
+                            if let activityStatus = viewModel.activityStatus {
+                                ChatActivityStatusView(
+                                    text: activityStatus,
+                                    isClusterStart: !hasVisibleStreamingMessage && isStreamingClusterStart(role: .coach)
+                                )
+                            }
+                        }
+                        .id("streamingResponse")
                         .accessibilityIdentifier("chat.streamingBubble")
                         .transition(
                             .asymmetric(
@@ -64,6 +76,9 @@ struct ChatView: View {
             .onChange(of: viewModel.streamingMessage?.content) { _, _ in
                 scrollToBottom(proxy: proxy, animated: true)
             }
+            .onChange(of: viewModel.activityStatus) { _, _ in
+                scrollToBottom(proxy: proxy, animated: true)
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 ChatInput(draft: $draft) { text in
                     viewModel.send(text, modelContext: modelContext)
@@ -75,6 +90,15 @@ struct ChatView: View {
     private func isClusterStart(at index: Int) -> Bool {
         guard index > 0 else { return true }
         return viewModel.messages[index - 1].role != viewModel.messages[index].role
+    }
+
+    private var shouldShowStreamingResponse: Bool {
+        hasVisibleStreamingMessage || viewModel.activityStatus != nil
+    }
+
+    private var hasVisibleStreamingMessage: Bool {
+        guard let streamingMessage = viewModel.streamingMessage else { return false }
+        return !streamingMessage.content.isEmpty
     }
 
     private func isStreamingClusterStart(role: MessageRole) -> Bool {
@@ -89,5 +113,29 @@ struct ChatView: View {
         } else {
             action()
         }
+    }
+}
+
+private struct ChatActivityStatusView: View {
+    let text: String
+    var isClusterStart: Bool = true
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(text)
+                    .font(Typography.serifBody(15))
+                    .foregroundStyle(Color.ledgerTextTertiary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: UIScreen.main.bounds.width * 0.82, alignment: .leading)
+
+            Spacer(minLength: 40)
+        }
+        .padding(.top, isClusterStart ? 18 : 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
+        .accessibilityIdentifier("chat.activityStatus")
     }
 }
