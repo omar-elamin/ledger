@@ -54,7 +54,30 @@ enum HistoryPreviewSeeder {
                     )
                 )
             }
+
+            for message in day.messages {
+                context.insert(
+                    StoredMessage(
+                        id: UUID(),
+                        role: message.role,
+                        content: message.content,
+                        timestamp: dated(dayStart, hour: message.hour, minute: message.minute, calendar: calendar)
+                    )
+                )
+            }
         }
+
+        var identity = ""
+        for (key, value) in identityFacts {
+            identity = IdentityProfileDocument.upserting(key: key, value: value, into: identity)
+        }
+        context.insert(
+            IdentityProfile(
+                scope: IdentityProfile.defaultScope,
+                markdownContent: identity,
+                lastUpdated: now
+            )
+        )
 
         try context.save()
         return true
@@ -127,6 +150,20 @@ enum HistoryPreviewSeeder {
         ) ?? dayStart
     }
 
+    private static let identityFacts: [(String, String)] = [
+        ("name", "Omar"),
+        ("height", "183cm"),
+        ("current_weight", "82.4kg"),
+        ("goal_weight", "75kg"),
+        ("goal_framing", "wants to rebuild his previously-trained 75kg physique after a 9-month break"),
+        ("origin_story", "was lifting consistently until about 9 months ago, then fell off during a life transition"),
+        ("approach", "moderate deficit, protein-forward eating, 3-4 lifting sessions per week"),
+        ("calorie_target", "1900"),
+        ("protein_target", "160"),
+        ("goal_start_date", "2026-04-01"),
+        ("shoulder_constraint", "tight right shoulder — keep overhead volume limited")
+    ]
+
     private static let days: [DaySeed] = [
         DaySeed(
             dayOffset: 1,
@@ -136,12 +173,16 @@ enum HistoryPreviewSeeder {
                 MealSeed(hour: 20, minute: 25, description: "Steak, potatoes, side salad", calories: 760, protein: 54)
             ],
             workouts: [
-                WorkoutSeed(hour: 18, minute: 12, exercise: "Bench press", summary: "4×6 @ 80kg", notes: nil),
+                WorkoutSeed(hour: 18, minute: 12, exercise: "Bench press", summary: "4×6 @ 80kg", notes: "first time at 80 since the restart — felt solid"),
                 WorkoutSeed(hour: 18, minute: 28, exercise: "Incline DB press", summary: "3×10 @ 32kg", notes: "last set slowed")
             ],
             metrics: [
                 MetricSeed(hour: 7, minute: 2, type: "sleep", value: "7h 34m", context: nil),
                 MetricSeed(hour: 7, minute: 3, type: "weight", value: "82.4kg", context: nil)
+            ],
+            messages: [
+                MessageSeed(hour: 18, minute: 30, role: "user", content: "bench 4x6 @ 80 today, first time back at 80 since the restart"),
+                MessageSeed(hour: 18, minute: 31, role: "coach", content: "That's a real checkpoint. Last time you benched 80 was pre-break. Muscle memory is doing its job.")
             ]
         ),
         DaySeed(
@@ -164,7 +205,14 @@ enum HistoryPreviewSeeder {
             ],
             workouts: [],
             metrics: [
-                MetricSeed(hour: 8, minute: 1, type: "mood", value: "flat", context: "low sleep")
+                MetricSeed(hour: 7, minute: 10, type: "hrv", value: "24", context: "crashed after drinks"),
+                MetricSeed(hour: 8, minute: 1, type: "mood", value: "flat", context: "feeling gross")
+            ],
+            messages: [
+                MessageSeed(hour: 8, minute: 5, role: "user", content: "had like 4 beers with friends last night. HRV is 24 this morning and I feel gross, skipping the gym"),
+                MessageSeed(hour: 8, minute: 6, role: "coach", content: "Right call. HRV crashed to 24 from a usual 30s — that's a 30% hit. Recovery day. Eat, hydrate, sleep. Don't pile a session on top."),
+                MessageSeed(hour: 19, minute: 55, role: "user", content: "just got a burger and fries"),
+                MessageSeed(hour: 19, minute: 56, role: "coach", content: "Fine. Body wants the salt and calories. Tomorrow is the real day.")
             ]
         ),
         DaySeed(
@@ -251,10 +299,14 @@ enum HistoryPreviewSeeder {
                 MealSeed(hour: 20, minute: 10, description: "Yogurt bowl", calories: 310, protein: 25)
             ],
             workouts: [
-                WorkoutSeed(hour: 17, minute: 50, exercise: "Overhead press", summary: "5×5 @ 50kg", notes: nil)
+                WorkoutSeed(hour: 17, minute: 50, exercise: "Overhead press", summary: "5×5 @ 50kg", notes: "kept it light — right shoulder still a bit tight")
             ],
             metrics: [
                 MetricSeed(hour: 7, minute: 6, type: "weight", value: "82.1kg", context: nil)
+            ],
+            messages: [
+                MessageSeed(hour: 17, minute: 52, role: "user", content: "OHP 5x5 @ 50 — kept it light, shoulder still a bit tight"),
+                MessageSeed(hour: 17, minute: 53, role: "coach", content: "Good read. No need to push the shoulder right now. Banking clean reps is the play.")
             ]
         ),
         DaySeed(
@@ -289,6 +341,28 @@ private struct DaySeed {
     let meals: [MealSeed]
     let workouts: [WorkoutSeed]
     let metrics: [MetricSeed]
+    let messages: [MessageSeed]
+
+    init(
+        dayOffset: Int,
+        meals: [MealSeed],
+        workouts: [WorkoutSeed],
+        metrics: [MetricSeed],
+        messages: [MessageSeed] = []
+    ) {
+        self.dayOffset = dayOffset
+        self.meals = meals
+        self.workouts = workouts
+        self.metrics = metrics
+        self.messages = messages
+    }
+}
+
+private struct MessageSeed {
+    let hour: Int
+    let minute: Int
+    let role: String
+    let content: String
 }
 
 private struct MealSeed {
