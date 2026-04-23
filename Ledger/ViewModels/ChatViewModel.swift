@@ -39,9 +39,10 @@ final class ChatViewModel {
             let storedMessages = try modelContext.fetch(descriptor)
 
             if storedMessages.isEmpty {
+                // Keep this seeded opener in sync with CoachPrompt.firstConversationSection.
                 let openingMessage = Message(
                     role: .coach,
-                    content: "Hi. I'm here to help with your body — eating, training, sleep, all of it. What's going on with you?",
+                    content: CoachPrompt.firstConversationOpener,
                     timestamp: now()
                 )
                 modelContext.insert(StoredMessage(message: openingMessage))

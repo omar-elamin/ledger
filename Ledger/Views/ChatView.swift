@@ -44,7 +44,7 @@ struct ChatView: View {
                             )
                         )
                     }
-                    Color.clear.frame(height: 4).id("bottom")
+                    Color.clear.frame(height: 36).id("bottom")
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)

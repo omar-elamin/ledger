@@ -12,7 +12,7 @@ final class LedgerUITests: XCTestCase {
         let app = launchApp(fixture: fixture)
 
         XCTAssertTrue(
-            staticText(containing: "What's going on with you?", in: app)
+            staticText(containing: "What should I call you?", in: app)
                 .waitForExistence(timeout: 5)
         )
     }

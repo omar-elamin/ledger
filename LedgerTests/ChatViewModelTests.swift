@@ -20,7 +20,7 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertEqual(try TestHelpers.fetchMessages(from: context).count, 1)
         XCTAssertEqual(
             viewModel.messages.first?.content,
-            "Hi. I'm here to help with your body — eating, training, sleep, all of it. What's going on with you?"
+            "Hi. What should I call you?"
         )
     }
 
