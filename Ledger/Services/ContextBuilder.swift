@@ -17,12 +17,13 @@ struct ContextBuilder {
     }
 
     func buildChatContext() -> String {
+        let todayLabel = shortDateFormatter.string(from: now())
         let sections = [
             "## Who this person is\n\(identityContent())",
             "## Patterns observed\n\(patternsContent())",
             "## Where they are right now\n\(activeStateContent())",
             "## Recent days\n\(recentDaysContent())",
-            "## Today so far\n\(todayMarkdown())"
+            "## Today so far (\(todayLabel))\n\(todayMarkdown())"
         ]
         return sections.joined(separator: "\n\n")
     }
@@ -254,13 +255,45 @@ struct ContextBuilder {
             }
 
             return summaries.map { summary in
-                "\(Self.summaryDateFormatter.string(from: summary.date)): \(summary.summaryText)"
+                "\(dateWithOffset(for: summary.date)): \(summary.summaryText)"
             }
             .joined(separator: "\n")
         } catch {
             print("Failed to fetch recent daily summaries: \(error)")
             return "No daily summaries yet."
         }
+    }
+
+    private func dateWithOffset(for date: Date) -> String {
+        let days = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: date),
+            to: calendar.startOfDay(for: now())
+        ).day ?? 0
+
+        switch days {
+        case ...0:
+            return "today"
+        case 1:
+            return "yesterday"
+        case 2...7:
+            return "\(days) days ago"
+        default:
+            return "\(shortDateFormatter.string(from: date)) (\(days) days ago)"
+        }
+    }
+
+    private var shortDateFormatter: DateFormatter {
+        // Locale pinned to en_US_POSIX so the LLM context always reads "Apr 23"
+        // regardless of the device/test locale. TZ follows the injected calendar
+        // so tests with a UTC calendar and production with device-local calendar
+        // both render consistent day labels.
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "MMM d"
+        return formatter
     }
 
     private func fetchMeals(start: Date, end: Date) throws -> [StoredMeal] {
@@ -304,6 +337,7 @@ struct ContextBuilder {
         formatter.dateFormat = "EEE MMM d"
         return formatter
     }()
+
 }
 
 struct StructuredDayData {

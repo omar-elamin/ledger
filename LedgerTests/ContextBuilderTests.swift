@@ -31,6 +31,58 @@ final class ContextBuilderTests: XCTestCase {
         XCTAssertTrue(contextBlock.contains("Body / recovery"))
     }
 
+    func testRecentDaysAndTodayHeaderUseRelativeOffsets() throws {
+        let container = try TestHelpers.makeInMemoryContainer()
+        let context = ModelContext(container)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        let now = calendar.date(
+            from: DateComponents(
+                timeZone: calendar.timeZone,
+                year: 2026, month: 4, day: 23, hour: 15, minute: 0
+            )
+        )!
+
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: now)!
+        let twoDaysAgo = calendar.date(byAdding: .day, value: -2, to: now)!
+        let threeDaysAgo = calendar.date(byAdding: .day, value: -3, to: now)!
+        let eightDaysAgo = calendar.date(byAdding: .day, value: -8, to: now)!
+
+        for (date, text) in [
+            (yesterday, "Solid recovery day."),
+            (twoDaysAgo, "Training went well."),
+            (threeDaysAgo, "Rough one — three beers Thursday night pushed HRV to 31."),
+            (eightDaysAgo, "Earlier cycle note.")
+        ] {
+            context.insert(
+                DailySummary(
+                    date: calendar.startOfDay(for: date),
+                    summaryText: text,
+                    keyStats: .empty
+                )
+            )
+        }
+        try context.save()
+
+        let builder = ContextBuilder(
+            modelContext: context,
+            calendar: calendar,
+            now: { now }
+        )
+        let block = builder.buildChatContext()
+
+        XCTAssertTrue(block.contains("## Today so far (Apr 23)"),
+                      "Expected dated today-header, got:\n\(block)")
+        XCTAssertTrue(block.contains("yesterday: Solid recovery day."),
+                      "Expected 'yesterday:' prefix, got:\n\(block)")
+        XCTAssertTrue(block.contains("2 days ago: Training went well."),
+                      "Expected '2 days ago:' prefix, got:\n\(block)")
+        XCTAssertTrue(block.contains("3 days ago: Rough one"),
+                      "Expected '3 days ago:' prefix, got:\n\(block)")
+        XCTAssertTrue(block.contains("Apr 15 (8 days ago): Earlier cycle note."),
+                      "Expected absolute-date prefix for 8-day-old summary, got:\n\(block)")
+    }
+
     func testArchiveSearchReturnsNewestMatchesFirst() throws {
         let container = try TestHelpers.makeInMemoryContainer()
         let context = ModelContext(container)

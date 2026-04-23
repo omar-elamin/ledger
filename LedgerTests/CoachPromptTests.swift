@@ -57,6 +57,21 @@ final class CoachPromptTests: XCTestCase {
         XCTAssertTrue(prompt.contains(#""Hi. What should I call you?""#))
     }
 
+    func testFirstConversationIncludesWhatToAvoidSubsection() {
+        let prompt = CoachPrompt.systemPrompt(
+            contextBlock: """
+            ## Who this person is
+            No stable identity facts recorded yet.
+            """
+        )
+
+        XCTAssertTrue(prompt.contains("### What to avoid"))
+        XCTAssertTrue(prompt.contains("**Compound questions.**"))
+        XCTAssertTrue(prompt.contains("**Enumerated options.**"))
+        XCTAssertTrue(prompt.contains(#"Wrong: "Nice to meet you, Marco. How much do you weigh now, and how"#))
+        XCTAssertTrue(prompt.contains(#"Right: "What's going on with you?""#))
+    }
+
     func testPromptSkipsFirstConversationSectionWhenIdentityContainsFacts() {
         let prompt = CoachPrompt.systemPrompt(
             contextBlock: """
