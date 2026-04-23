@@ -63,6 +63,86 @@ final class MemoryMaintainerTests: XCTestCase {
         XCTAssertTrue(prompts[0].userPrompt.contains("\"trainingStreakDays\""))
     }
 
+    func testActiveStatePayloadIncludesNameWhenIdentityFactPresent() async throws {
+        let container = try TestHelpers.makeInMemoryContainer()
+        let context = ModelContext(container)
+        let now = Date(timeIntervalSince1970: 1_777_777_200)
+        let calendar = Calendar(identifier: .gregorian)
+
+        context.insert(
+            IdentityProfile(
+                markdownContent: IdentityProfileDocument.upserting(
+                    key: "name",
+                    value: "Marco",
+                    into: ""
+                )
+            )
+        )
+        try context.save()
+
+        let generator = StubMemoryTextGenerator(responses: ["ok"])
+        let maintainer = MemoryMaintainer(
+            modelContainer: container,
+            textGenerator: generator,
+            calendar: calendar,
+            now: { now }
+        )
+
+        try await maintainer.updateActiveState()
+
+        let prompts = await generator.promptsSnapshot()
+        let payload = try XCTUnwrap(prompts.first?.userPrompt)
+        let compactPayload = payload.replacingOccurrences(of: " ", with: "")
+        XCTAssertTrue(compactPayload.contains("\"name\":\"Marco\""), "expected name to appear in payload; got \(payload)")
+    }
+
+    func testActiveStatePayloadOmitsNameWhenIdentityFactAbsent() async throws {
+        let container = try TestHelpers.makeInMemoryContainer()
+        let context = ModelContext(container)
+        let now = Date(timeIntervalSince1970: 1_777_777_200)
+        let calendar = Calendar(identifier: .gregorian)
+
+        context.insert(
+            IdentityProfile(
+                markdownContent: IdentityProfileDocument.upserting(
+                    key: "goal_weight",
+                    value: "75kg",
+                    into: ""
+                )
+            )
+        )
+        try context.save()
+
+        let generator = StubMemoryTextGenerator(responses: ["ok"])
+        let maintainer = MemoryMaintainer(
+            modelContainer: container,
+            textGenerator: generator,
+            calendar: calendar,
+            now: { now }
+        )
+
+        try await maintainer.updateActiveState()
+
+        let prompts = await generator.promptsSnapshot()
+        let payload = try XCTUnwrap(prompts.first?.userPrompt)
+        XCTAssertFalse(payload.contains("\"name\":"), "expected no name field in payload when identity has no name; got \(payload)")
+        XCTAssertTrue(payload.contains("\"goalWeightKg\""), "other goal-frame fields should still flow through")
+    }
+
+    func testActiveStateSystemPromptForbidsFabricatingNames() {
+        let prompt = MemoryMaintainer.activeStateSystemPrompt
+        XCTAssertTrue(prompt.contains("preComputedContext.goalFrame.name"))
+        XCTAssertTrue(prompt.contains("Never write a name you did not receive."))
+        XCTAssertTrue(prompt.contains("## Example when no name is on file"))
+    }
+
+    func testPatternsSystemPromptScrubsNamedExampleAndForbidsNames() {
+        let prompt = MemoryMaintainer.patternsSystemPrompt
+        XCTAssertFalse(prompt.contains("Omar's protein drops"))
+        XCTAssertTrue(prompt.contains("must not include the user's name"))
+        XCTAssertTrue(prompt.contains("behavioral, not personal."))
+    }
+
     func testSummarizeTodayUpsertsSingleDailySummary() async throws {
         let container = try TestHelpers.makeInMemoryContainer()
         let context = ModelContext(container)

@@ -36,6 +36,16 @@ actor MemoryMaintainer {
     memory should make this fast. HRV baseline still forming, only 5
     days of data. No issues flagged."
 
+    ## Example when no name is on file
+
+    "3 weeks into a cut from 83kg toward 75kg, rebuilding training
+    after a 9-month break. Current 7-day average 82.6kg — down 0.4kg
+    from last week, on track. Eating averages 1,850 cal and 138g
+    protein, both slightly under targets. Bench at 50kg for 3×5,
+    target 85kg. HRV baseline still forming, only 5 days of data."
+
+    No subject needed. The coach knows who this is.
+
     ## Example of a bad brief (do NOT produce output like this)
 
     "Current weight: 83kg. Goal: 75kg. Training: restarting, currently
@@ -56,6 +66,13 @@ actor MemoryMaintainer {
     If a field is null or flagged as insufficient data, do not invent.
     Name the gap if it matters (e.g. "HRV baseline still forming"),
     or leave it unmentioned if it doesn't.
+
+    The person's name, if known, is in `preComputedContext.goalFrame.name`.
+    If that field is null, do not write any name. Refer to them as "they"
+    or "the user," or omit the subject entirely where the prose flows
+    without it ("3 weeks into a cut..." rather than "Chris is 3 weeks
+    into a cut..."). Never write a name you did not receive. Fabricating
+    a name corrupts the situational brief the coach reads on every turn.
 
     ## Output
 
@@ -177,8 +194,11 @@ actor MemoryMaintainer {
     ## Specificity test
 
     Good patterns are specific enough that they couldn't describe a
-    random other user. "Omar's protein drops on Turkish food days" is
-    specific. "User eats breakfast" is not.
+    random other user. "Protein drops below 130g on Turkish food days"
+    is specific. "User eats breakfast" is not.
+
+    Pattern descriptions must not include the user's name. Patterns
+    are behavioral, not personal.
 
     ## Confidence calibration
 
@@ -1042,6 +1062,7 @@ actor MemoryMaintainer {
         extendedMetrics: [StoredMetric],
         today: Date
     ) -> GoalFrameBlock? {
+        let name = identityFacts["name"]
         let framing = identityFacts["goal_framing"]
         let originStory = identityFacts["origin_story"]
         let approach = identityFacts["approach"]
@@ -1065,12 +1086,13 @@ actor MemoryMaintainer {
             return (latestWeight - goalWeight).rounded(digits: 1)
         }()
 
-        if framing == nil, originStory == nil, approach == nil, goalWeight == nil,
+        if name == nil, framing == nil, originStory == nil, approach == nil, goalWeight == nil,
            latestWeight == nil, goalStart == nil, calorieTarget == nil, proteinTarget == nil {
             return nil
         }
 
         return GoalFrameBlock(
+            name: name,
             framing: framing,
             originStory: originStory,
             approach: approach,
@@ -1613,6 +1635,7 @@ struct ActiveStateEnrichment: Encodable {
 }
 
 struct GoalFrameBlock: Encodable {
+    let name: String?
     let framing: String?
     let originStory: String?
     let approach: String?
