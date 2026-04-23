@@ -17,13 +17,13 @@ final class HierarchicalMemoryPipelineTests: XCTestCase {
             scripts: [
                 .events([
                     .toolUseStart(id: "profile", name: "update_identity_fact"),
-                    .toolUseDelta(id: "profile", partialJSON: #"{"key":"goal_weight","value":"78kg"}"#),
+                    .toolUseDelta(id: "profile", partialJSON: #"{"key":"goal_weight","value":"78kg","evidence":"cut to 78kg"}"#),
                     .toolUseEnd(id: "profile"),
                     .messageStop
                 ]),
                 .events([
                     .toolUseStart(id: "meal", name: "update_meal_log"),
-                    .toolUseDelta(id: "meal", partialJSON: #"{"description":"Chicken rice box","estimated_calories":760,"estimated_protein_grams":57}"#),
+                    .toolUseDelta(id: "meal", partialJSON: #"{"description":"Chicken rice box","estimated_calories":760,"estimated_protein_grams":57,"evidence":"had chicken rice for lunch"}"#),
                     .toolUseEnd(id: "meal"),
                     .messageStop
                 ]),

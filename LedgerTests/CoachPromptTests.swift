@@ -25,6 +25,22 @@ final class CoachPromptTests: XCTestCase {
         XCTAssertFalse(prompt.contains("## First conversation"))
     }
 
+    func testPromptIncludesGroundingSubsectionForToolUse() {
+        let prompt = CoachPrompt.systemPrompt(
+            contextBlock: """
+            ## Who this person is
+            ## Goals
+            - goal_weight: 78kg
+            """
+        )
+
+        XCTAssertTrue(prompt.contains("## Grounding tool calls"))
+        XCTAssertTrue(prompt.contains("requires an `evidence` field"))
+        XCTAssertTrue(prompt.contains("verbatim quote from the CURRENT user message"))
+        XCTAssertTrue(prompt.contains("Do not paraphrase. Do not invent."))
+        XCTAssertTrue(prompt.contains("A day with no logged workouts because the user skipped"))
+    }
+
     func testPromptInjectsFirstConversationSectionWhenIdentityIsPlaceholder() {
         let prompt = CoachPrompt.systemPrompt(
             contextBlock: """

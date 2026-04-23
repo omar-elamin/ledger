@@ -31,12 +31,17 @@ enum CoachTools {
                     ]),
                     "estimated_protein_grams": .object([
                         "type": .string("integer")
+                    ]),
+                    "evidence": .object([
+                        "type": .string("string"),
+                        "description": .string("A short verbatim quote from the CURRENT user message that supplies the food content being logged. Copy their exact words (e.g. 'had a burger for lunch', 'eggs and toast', '2 factor meals'). If the current message has no specific food content, do not fire this tool — do not fabricate a quote.")
                     ])
                 ]),
                 "required": .array([
                     .string("description"),
                     .string("estimated_calories"),
-                    .string("estimated_protein_grams")
+                    .string("estimated_protein_grams"),
+                    .string("evidence")
                 ])
             ]),
             eagerInputStreaming: true
@@ -58,11 +63,16 @@ enum CoachTools {
                     "notes": .object([
                         "type": .string("string"),
                         "description": .string("Optional: how it felt, compared to prior")
+                    ]),
+                    "evidence": .object([
+                        "type": .string("string"),
+                        "description": .string("A short verbatim quote from the CURRENT user message that describes the training event. Copy their exact words (e.g. 'benched 80kg for 4x6', 'did 3 sets of deadlifts', 'pullups 10 8 6'). If the current message does not describe a training event that happened, do not fire this tool — do not fabricate a quote.")
                     ])
                 ]),
                 "required": .array([
                     .string("exercise"),
-                    .string("summary")
+                    .string("summary"),
+                    .string("evidence")
                 ])
             ]),
             eagerInputStreaming: true
@@ -90,11 +100,16 @@ enum CoachTools {
                     "context": .object([
                         "type": .string("string"),
                         "description": .string("Optional context, e.g. '(low)', 'after drinks'")
+                    ]),
+                    "evidence": .object([
+                        "type": .string("string"),
+                        "description": .string("A short verbatim quote from the CURRENT user message that supplies this metric value. Copy their exact words (e.g. 'hrv was 45', 'slept 7 hours', 'weight 82.5'). If the current message does not state a specific metric value, do not fire this tool — do not fabricate a quote.")
                     ])
                 ]),
                 "required": .array([
                     .string("type"),
-                    .string("value")
+                    .string("value"),
+                    .string("evidence")
                 ])
             ]),
             eagerInputStreaming: true
@@ -114,11 +129,16 @@ enum CoachTools {
                     "value": .object([
                         "type": .string("string"),
                         "description": .string("The fact, framing, or constraint to store. For framings, preserve the user's own language — do not paraphrase. Values for framing, constraint, ruled_out, and preference keys can be multi-sentence.")
+                    ]),
+                    "evidence": .object([
+                        "type": .string("string"),
+                        "description": .string("A short verbatim quote from the CURRENT user message that reveals this identity fact. Copy their exact words (e.g. 'my name is Marco', 'I want to lose 20 pounds', 'bad shoulder'). If the current message does not reveal anything new about who they are, do not fire this tool — do not fabricate a quote.")
                     ])
                 ]),
                 "required": .array([
                     .string("key"),
-                    .string("value")
+                    .string("value"),
+                    .string("evidence")
                 ])
             ]),
             eagerInputStreaming: true

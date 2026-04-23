@@ -5,6 +5,19 @@ import XCTest
 
 @MainActor
 final class ChatViewModelTests: XCTestCase {
+    private var originalLogWriter: ((URL, Data) throws -> Void)!
+
+    override func setUp() {
+        super.setUp()
+        originalLogWriter = ToolCallVerifier.logWriter
+        ToolCallVerifier.logWriter = { _, _ in }
+    }
+
+    override func tearDown() {
+        ToolCallVerifier.logWriter = originalLogWriter
+        super.tearDown()
+    }
+
     func testSeedsOpeningMessageOnlyOnce() throws {
         let container = try TestHelpers.makeInMemoryContainer()
         let context = ModelContext(container)
@@ -76,16 +89,16 @@ final class ChatViewModelTests: XCTestCase {
             scripts: [
                 .events([
                     .toolUseStart(id: "meal", name: "update_meal_log"),
-                    .toolUseDelta(id: "meal", partialJSON: #"{"description":"Chicken","estimated_calories":300,"estimated_protein_grams":50}"#),
+                    .toolUseDelta(id: "meal", partialJSON: #"{"description":"Chicken","estimated_calories":300,"estimated_protein_grams":50,"evidence":"log this"}"#),
                     .toolUseEnd(id: "meal"),
                     .toolUseStart(id: "workout", name: "record_workout_set"),
-                    .toolUseDelta(id: "workout", partialJSON: #"{"exercise":"Bench press","summary":"3x5 @ 100kg","notes":"Moved well"}"#),
+                    .toolUseDelta(id: "workout", partialJSON: #"{"exercise":"Bench press","summary":"3x5 @ 100kg","notes":"Moved well","evidence":"log this"}"#),
                     .toolUseEnd(id: "workout"),
                     .toolUseStart(id: "metric", name: "update_metric"),
-                    .toolUseDelta(id: "metric", partialJSON: #"{"type":"sleep","value":"7h 10m","context":"solid"}"#),
+                    .toolUseDelta(id: "metric", partialJSON: #"{"type":"sleep","value":"7h 10m","context":"solid","evidence":"log this"}"#),
                     .toolUseEnd(id: "metric"),
                     .toolUseStart(id: "profile", name: "update_identity_fact"),
-                    .toolUseDelta(id: "profile", partialJSON: #"{"key":"goal","value":"cut"}"#),
+                    .toolUseDelta(id: "profile", partialJSON: #"{"key":"goal","value":"cut","evidence":"log this"}"#),
                     .toolUseEnd(id: "profile"),
                     .textDelta("Logged."),
                     .messageStop
@@ -130,13 +143,13 @@ final class ChatViewModelTests: XCTestCase {
             scripts: [
                 .events([
                     .toolUseStart(id: "profile-1", name: "update_identity_fact"),
-                    .toolUseDelta(id: "profile-1", partialJSON: #"{"key":"goal","value":"cut"}"#),
+                    .toolUseDelta(id: "profile-1", partialJSON: #"{"key":"goal","value":"cut","evidence":"first"}"#),
                     .toolUseEnd(id: "profile-1"),
                     .messageStop
                 ]),
                 .events([
                     .toolUseStart(id: "profile-2", name: "update_identity_fact"),
-                    .toolUseDelta(id: "profile-2", partialJSON: #"{"key":"goal","value":"maintain"}"#),
+                    .toolUseDelta(id: "profile-2", partialJSON: #"{"key":"goal","value":"maintain","evidence":"second"}"#),
                     .toolUseEnd(id: "profile-2"),
                     .messageStop
                 ])
@@ -286,5 +299,47 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertTrue(archiveToolUse.content.contains("Travel week"))
         XCTAssertEqual(try TestHelpers.fetchAll(WeeklySummary.self, from: context).count, 1)
         XCTAssertEqual(try TestHelpers.fetchAll(StoredMeal.self, from: context).count, 0)
+    }
+
+    func testVerifierBlocksHallucinatedWorkoutAndSkipsWrite() async throws {
+        var capturedLogs: [Data] = []
+        ToolCallVerifier.logWriter = { _, data in capturedLogs.append(data) }
+
+        let container = try TestHelpers.makeInMemoryContainer()
+        let context = ModelContext(container)
+        let client = StubStreamingClient(
+            scripts: [
+                .events([
+                    .toolUseStart(id: "workout", name: "record_workout_set"),
+                    .toolUseDelta(id: "workout", partialJSON: #"{"exercise":"Bench press","summary":"4×6 @ 80kg","notes":"First time at 80kg since restart"}"#),
+                    .toolUseEnd(id: "workout"),
+                    .textDelta("Tough one."),
+                    .messageStop
+                ])
+            ]
+        )
+        let viewModel = ChatViewModel(claudeClient: client)
+        viewModel.loadInitialMessages(from: context)
+
+        viewModel.send(
+            "fucked up today. skipped the gym, ate shit all day, drank last night",
+            modelContext: context
+        )
+        await waitUntil {
+            !viewModel.isStreaming
+        }
+
+        let workouts = try TestHelpers.fetchAll(StoredWorkoutSet.self, from: context)
+        XCTAssertEqual(workouts.count, 0, "Hallucinated workout write must be blocked")
+
+        let completedToolUses = await client.completedToolUsesSnapshot()
+        let workoutToolUse = try XCTUnwrap(completedToolUses.first(where: { $0.id == "workout" }))
+        XCTAssertEqual(workoutToolUse.content, "OK")
+        XCTAssertFalse(workoutToolUse.isError)
+
+        XCTAssertEqual(capturedLogs.count, 1)
+        let logLine = try XCTUnwrap(String(data: capturedLogs[0], encoding: .utf8))
+        XCTAssertTrue(logLine.contains("\"verdict\":\"blocked\""))
+        XCTAssertTrue(logLine.contains("\"toolName\":\"record_workout_set\""))
     }
 }

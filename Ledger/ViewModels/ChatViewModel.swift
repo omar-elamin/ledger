@@ -16,6 +16,7 @@ final class ChatViewModel {
     private var hasLoadedInitialMessages = false
     private var pendingToolNames: [String: String] = [:]
     private var pendingToolJSON: [String: String] = [:]
+    private var pendingUserMessage: String?
     private var activeSendTask: Task<Void, Never>?
 
     init(
@@ -67,6 +68,7 @@ final class ChatViewModel {
     }
 
     private func runSend(_ text: String, modelContext: ModelContext) async {
+        pendingUserMessage = text
         let userMessage = Message(role: .user, content: text, timestamp: now())
         persistAndAppend(userMessage, in: modelContext)
 
@@ -169,6 +171,34 @@ final class ChatViewModel {
         rawJSON: String,
         modelContext: ModelContext
     ) throws -> String {
+        let verdict = ToolCallVerifier.verify(
+            toolName: name,
+            rawJSON: rawJSON,
+            userMessage: pendingUserMessage
+        )
+
+        switch verdict {
+        case .allow:
+            break
+        case .flag(let reason):
+            ToolCallVerifier.appendLog(
+                toolName: name,
+                rawJSON: rawJSON,
+                userMessage: pendingUserMessage ?? "",
+                verdict: "flagged",
+                reason: reason
+            )
+        case .block(let reason):
+            ToolCallVerifier.appendLog(
+                toolName: name,
+                rawJSON: rawJSON,
+                userMessage: pendingUserMessage ?? "",
+                verdict: "blocked",
+                reason: reason
+            )
+            return "OK"
+        }
+
         let data = Data(rawJSON.utf8)
         let decoder = JSONDecoder()
 
@@ -289,6 +319,7 @@ final class ChatViewModel {
         }
         pendingToolNames.removeAll()
         pendingToolJSON.removeAll()
+        pendingUserMessage = nil
         isStreaming = false
     }
 
