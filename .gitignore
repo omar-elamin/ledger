@@ -25,3 +25,7 @@ Ledger/Secrets.swift
 
 ## xcodegen output (regenerate with `xcodegen generate`)
 Ledger.xcodeproj/
+
+## Local editor / agent settings
+.obsidian/
+.claude/
