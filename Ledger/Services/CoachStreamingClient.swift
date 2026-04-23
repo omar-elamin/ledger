@@ -1,6 +1,6 @@
 import Foundation
 
-protocol CoachStreamingClient {
+protocol CoachStreamingClient: Sendable {
     var hasAPIKeyConfigured: Bool { get }
 
     func streamMessage(

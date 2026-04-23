@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  ios-tests:
+  ios-core-tests:
     runs-on: macos-15
 
     steps:
@@ -51,14 +51,70 @@ jobs:
           set -o pipefail
           xcodebuild \
             -project Ledger.xcodeproj \
-            -scheme Ledger \
+            -scheme "Ledger Core" \
             -destination "id=${{ steps.simulator.outputs.device_id }}" \
-            -resultBundlePath TestResults.xcresult \
+            -resultBundlePath CoreTestResults.xcresult \
             test
 
       - name: Upload XCResult
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ledger-test-results
-          path: TestResults.xcresult
+          name: ledger-core-test-results
+          path: CoreTestResults.xcresult
+
+  ios-ui-tests:
+    runs-on: macos-15
+
+    steps:
+      - name: Check Out
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Create Empty Secrets File
+        run: |
+          if [ ! -f Ledger/Secrets.swift ]; then
+            cat <<'EOF' > Ledger/Secrets.swift
+          enum Secrets {
+              static let anthropicAPIKey = ""
+          }
+          EOF
+          fi
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Resolve Simulator
+        id: simulator
+        run: |
+          DEVICE_ID=$(
+            xcrun simctl list devices available |
+            sed -nE '/iPhone/s/.*\(([0-9A-Fa-f-]{36})\) \((Booted|Shutdown)\)[[:space:]]*$/\1/p' |
+            head -n 1
+          )
+
+          if [ -z "$DEVICE_ID" ]; then
+            echo "No available iPhone simulator found." >&2
+            exit 1
+          fi
+
+          echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Run UI Smoke Suite
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Ledger.xcodeproj \
+            -scheme "Ledger UI" \
+            -destination "id=${{ steps.simulator.outputs.device_id }}" \
+            -resultBundlePath UITestResults.xcresult \
+            test
+
+      - name: Upload XCResult
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ledger-ui-test-results
+          path: UITestResults.xcresult

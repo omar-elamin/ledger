@@ -1,11 +1,11 @@
 import Foundation
 
-enum MessageRole: String {
+enum MessageRole: String, Sendable {
     case user
     case coach
 }
 
-struct Message: Identifiable, Equatable {
+struct Message: Identifiable, Equatable, Sendable {
     var id: UUID
     var role: MessageRole
     var content: String

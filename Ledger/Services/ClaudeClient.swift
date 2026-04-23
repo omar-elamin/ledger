@@ -569,7 +569,7 @@ struct TopLevelAPIError: Decodable {
 }
 
 struct APIErrorPayload: Decodable {
-    let type: String
+    let type: String?
     let message: String
 }
 

@@ -64,11 +64,25 @@ schemes:
       targets:
         Ledger: all
     test:
+      targets:
+        - LedgerTests
+        - LedgerUITests
+  "Ledger Core":
+    build:
+      targets:
+        Ledger: all
+    test:
       gatherCoverageData: true
       coverageTargets:
         - Ledger
       targets:
         - LedgerTests
+  "Ledger UI":
+    build:
+      targets:
+        Ledger: all
+    test:
+      targets:
         - LedgerUITests
   "Ledger Live API":
     build:

@@ -7,7 +7,9 @@ struct LedgerApp: App {
 
     init() {
         let appEnvironment = LedgerAppEnvironment.bootstrap()
-        appEnvironment.memoryMaintenanceScheduler.registerBackgroundTasks()
+        if appEnvironment.shouldRegisterBackgroundTasks {
+            appEnvironment.memoryMaintenanceScheduler.registerBackgroundTasks()
+        }
         self.appEnvironment = appEnvironment
     }
 

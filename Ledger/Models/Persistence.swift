@@ -23,6 +23,117 @@ enum PatternConfidence: String, Codable, CaseIterable, Sendable {
     case high
 }
 
+enum LegacyLedgerSchema: VersionedSchema {
+    static let versionIdentifier = Schema.Version(1, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            StoredMessage.self,
+            StoredMeal.self,
+            StoredWorkoutSet.self,
+            StoredMetric.self,
+            ProfileEntry.self
+        ]
+    }
+
+    @Model
+    final class StoredMessage {
+        var id: UUID
+        var role: String
+        var content: String
+        var timestamp: Date
+
+        init(id: UUID = UUID(), role: String, content: String, timestamp: Date) {
+            self.id = id
+            self.role = role
+            self.content = content
+            self.timestamp = timestamp
+        }
+    }
+
+    @Model
+    final class StoredMeal {
+        var id: UUID
+        var date: Date
+        var descriptionText: String
+        var calories: Int
+        var protein: Int
+
+        init(
+            id: UUID = UUID(),
+            date: Date,
+            descriptionText: String,
+            calories: Int,
+            protein: Int
+        ) {
+            self.id = id
+            self.date = date
+            self.descriptionText = descriptionText
+            self.calories = calories
+            self.protein = protein
+        }
+    }
+
+    @Model
+    final class StoredWorkoutSet {
+        var id: UUID
+        var date: Date
+        var exercise: String
+        var summary: String
+        var notes: String?
+
+        init(
+            id: UUID = UUID(),
+            date: Date,
+            exercise: String,
+            summary: String,
+            notes: String? = nil
+        ) {
+            self.id = id
+            self.date = date
+            self.exercise = exercise
+            self.summary = summary
+            self.notes = notes
+        }
+    }
+
+    @Model
+    final class StoredMetric {
+        var id: UUID
+        var date: Date
+        var type: String
+        var value: String
+        var context: String?
+
+        init(
+            id: UUID = UUID(),
+            date: Date,
+            type: String,
+            value: String,
+            context: String? = nil
+        ) {
+            self.id = id
+            self.date = date
+            self.type = type
+            self.value = value
+            self.context = context
+        }
+    }
+
+    @Model
+    final class ProfileEntry {
+        @Attribute(.unique) var key: String
+        var value: String
+        var updatedAt: Date
+
+        init(key: String, value: String, updatedAt: Date = .now) {
+            self.key = key
+            self.value = value
+            self.updatedAt = updatedAt
+        }
+    }
+}
+
 enum LedgerSchemaV1: VersionedSchema {
     static let versionIdentifier = Schema.Version(1, 0, 0)
 
@@ -559,6 +670,12 @@ enum IdentityProfileDocument {
             .reduce(into: [String: String]()) { result, sectionFacts in
                 result.merge(sectionFacts, uniquingKeysWith: { _, latest in latest })
             }
+    }
+
+    static func sections(from markdown: String) -> [String: [String: String]] {
+        parse(markdown).reduce(into: [String: [String: String]]()) { result, entry in
+            result[entry.key.rawValue] = entry.value
+        }
     }
 
     static func render(_ sections: [IdentityProfileSection: [String: String]]) -> String {

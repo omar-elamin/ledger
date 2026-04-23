@@ -40,20 +40,27 @@ DEVICE_ID=$(
 )
 ```
 
-Run the deterministic unit/integration + UI suite:
+Run the deterministic core suite:
 
 ```bash
 xcodegen generate
-xcodebuild -project Ledger.xcodeproj -scheme Ledger -destination "id=$DEVICE_ID" test
+xcodebuild -project Ledger.xcodeproj -scheme "Ledger Core" -destination "id=$DEVICE_ID" test
 ```
 
-Run only the simulator UI tests:
+Run the simulator UI smoke suite:
 
 ```bash
-xcodebuild -project Ledger.xcodeproj -scheme Ledger -destination "id=$DEVICE_ID" -only-testing:LedgerUITests test
+xcodebuild -project Ledger.xcodeproj -scheme "Ledger UI" -destination "id=$DEVICE_ID" test
 ```
 
-Run the live Anthropic smoke suite:
+Run the manual heavy multi-day hierarchical memory E2E suite:
+
+```bash
+LEDGER_RUN_MEMORY_E2E=1 \
+xcodebuild -project Ledger.xcodeproj -scheme "Ledger UI" -destination "id=$DEVICE_ID" test
+```
+
+Run the live Anthropic smoke suite, including memory-maintainer prompt smokes:
 
 ```bash
 LEDGER_RUN_LIVE_API_TESTS=1 \
