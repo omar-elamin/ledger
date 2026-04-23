@@ -52,6 +52,8 @@ final class ClaudeClientGenerateTextTests: XCTestCase {
         XCTAssertEqual(json["max_tokens"] as? Int, 321)
         XCTAssertEqual(json["system"] as? String, "System prompt")
         XCTAssertEqual((json["tools"] as? [Any])?.count, 0)
+        XCTAssertNil(json["thinking"])
+        XCTAssertNil(json["output_config"])
 
         let messages = try XCTUnwrap(json["messages"] as? [[String: Any]])
         XCTAssertEqual(messages.count, 1)

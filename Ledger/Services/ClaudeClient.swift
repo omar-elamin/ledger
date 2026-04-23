@@ -242,10 +242,12 @@ actor ClaudeClient: CoachStreamingClient, MemoryTextGeneratingClient {
         let requestBody = MessagesRequest(
             model: Self.model,
             system: systemPrompt,
-            maxTokens: 2048,
+            maxTokens: 4096,
             stream: true,
             messages: messages,
-            tools: tools
+            tools: tools,
+            thinking: .hiddenAdaptive,
+            outputConfig: .mediumEffort
         )
 
         let request = try makeRequest(for: requestBody)
@@ -331,6 +333,28 @@ struct MessagesRequest: Encodable {
     let stream: Bool
     let messages: [APIMessage]
     let tools: [Tool]
+    let thinking: ThinkingConfig?
+    let outputConfig: OutputConfig?
+
+    init(
+        model: String,
+        system: String,
+        maxTokens: Int,
+        stream: Bool,
+        messages: [APIMessage],
+        tools: [Tool],
+        thinking: ThinkingConfig? = nil,
+        outputConfig: OutputConfig? = nil
+    ) {
+        self.model = model
+        self.system = system
+        self.maxTokens = maxTokens
+        self.stream = stream
+        self.messages = messages
+        self.tools = tools
+        self.thinking = thinking
+        self.outputConfig = outputConfig
+    }
 
     enum CodingKeys: String, CodingKey {
         case model
@@ -339,7 +363,22 @@ struct MessagesRequest: Encodable {
         case stream
         case messages
         case tools
+        case thinking
+        case outputConfig = "output_config"
     }
+}
+
+struct ThinkingConfig: Encodable {
+    let type: String
+    let display: String
+
+    static let hiddenAdaptive = ThinkingConfig(type: "adaptive", display: "omitted")
+}
+
+struct OutputConfig: Encodable {
+    let effort: String
+
+    static let mediumEffort = OutputConfig(effort: "medium")
 }
 
 struct APIMessage: Encodable {
@@ -363,12 +402,17 @@ struct APIMessage: Encodable {
 
 enum APIMessageContent: Encodable {
     case text(String)
+    case thinking(thinking: String, signature: String)
+    case redactedThinking(data: String)
     case toolUse(id: String, name: String, input: JSONValue)
     case toolResult(id: String, content: String, isError: Bool)
 
     enum CodingKeys: String, CodingKey {
         case type
         case text
+        case thinking
+        case signature
+        case data
         case id
         case name
         case input
@@ -383,6 +427,13 @@ enum APIMessageContent: Encodable {
         case .text(let text):
             try container.encode("text", forKey: .type)
             try container.encode(text, forKey: .text)
+        case .thinking(let thinking, let signature):
+            try container.encode("thinking", forKey: .type)
+            try container.encode(thinking, forKey: .thinking)
+            try container.encode(signature, forKey: .signature)
+        case .redactedThinking(let data):
+            try container.encode("redacted_thinking", forKey: .type)
+            try container.encode(data, forKey: .data)
         case .toolUse(let id, let name, let input):
             try container.encode("tool_use", forKey: .type)
             try container.encode(id, forKey: .id)
@@ -430,6 +481,8 @@ struct TurnState {
 
 enum InProgressBlock {
     case text(String)
+    case thinking(thinking: String, signature: String)
+    case redactedThinking(data: String)
     case toolUse(id: String, name: String, partialJSON: String, initialInput: JSONValue?)
 }
 
@@ -481,10 +534,15 @@ struct ContentBlockStartEvent: Decodable {
 
 enum ContentBlock: Decodable {
     case text
+    case thinking(ThinkingStartPayload)
+    case redactedThinking(RedactedThinkingStartPayload)
     case toolUse(ToolUseStartPayload)
 
     private enum CodingKeys: String, CodingKey {
         case type
+        case thinking
+        case signature
+        case data
         case id
         case name
         case input
@@ -495,6 +553,19 @@ enum ContentBlock: Decodable {
         switch try container.decode(String.self, forKey: .type) {
         case "text":
             self = .text
+        case "thinking":
+            self = .thinking(
+                ThinkingStartPayload(
+                    thinking: try container.decodeIfPresent(String.self, forKey: .thinking) ?? "",
+                    signature: try container.decodeIfPresent(String.self, forKey: .signature) ?? ""
+                )
+            )
+        case "redacted_thinking":
+            self = .redactedThinking(
+                RedactedThinkingStartPayload(
+                    data: try container.decodeIfPresent(String.self, forKey: .data) ?? ""
+                )
+            )
         case "tool_use":
             self = .toolUse(
                 ToolUseStartPayload(
@@ -507,6 +578,15 @@ enum ContentBlock: Decodable {
             self = .text
         }
     }
+}
+
+struct ThinkingStartPayload: Decodable {
+    let thinking: String
+    let signature: String
+}
+
+struct RedactedThinkingStartPayload: Decodable {
+    let data: String
 }
 
 struct ToolUseStartPayload: Decodable {
@@ -522,12 +602,16 @@ struct ContentBlockDeltaEvent: Decodable {
 
 enum ContentBlockDelta: Decodable {
     case text(String)
+    case thinking(String)
+    case signature(String)
     case inputJSON(String)
     case ignored
 
     private enum CodingKeys: String, CodingKey {
         case type
         case text
+        case thinking
+        case signature
         case partialJSON = "partial_json"
     }
 
@@ -536,6 +620,10 @@ enum ContentBlockDelta: Decodable {
         switch try container.decode(String.self, forKey: .type) {
         case "text_delta":
             self = .text(try container.decode(String.self, forKey: .text))
+        case "thinking_delta":
+            self = .thinking(try container.decode(String.self, forKey: .thinking))
+        case "signature_delta":
+            self = .signature(try container.decode(String.self, forKey: .signature))
         case "input_json_delta":
             self = .inputJSON(try container.decode(String.self, forKey: .partialJSON))
         default:

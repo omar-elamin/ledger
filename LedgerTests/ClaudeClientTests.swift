@@ -38,6 +38,42 @@ final class ClaudeClientTests: XCTestCase {
         }
     }
 
+    func testStreamMessageBuildsHiddenAdaptiveThinkingRequest() async throws {
+        MockURLProtocol.enqueue(
+            .init(
+                statusCode: 200,
+                headers: ["Content-Type": "text/event-stream"],
+                body: Data(secondTurnSSE.utf8)
+            )
+        )
+
+        let client = ClaudeClient(session: MockURLProtocol.makeSession())
+        let stream = await client.streamMessage(
+            messages: [Message(role: .user, content: "Hi", timestamp: Date())],
+            contextBlock: "## Who this person is\nNo saved profile yet.",
+            tools: CoachTools.all
+        )
+
+        for try await _ in stream {}
+
+        let request = try XCTUnwrap(MockURLProtocol.capturedRequests.first?.request)
+        XCTAssertNil(request.value(forHTTPHeaderField: "anthropic-beta"))
+
+        let requestBody = try XCTUnwrap(MockURLProtocol.capturedRequests.first?.body)
+        let json = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: requestBody) as? [String: Any]
+        )
+
+        XCTAssertEqual(json["max_tokens"] as? Int, 4096)
+
+        let thinking = try XCTUnwrap(json["thinking"] as? [String: Any])
+        XCTAssertEqual(thinking["type"] as? String, "adaptive")
+        XCTAssertEqual(thinking["display"] as? String, "omitted")
+
+        let outputConfig = try XCTUnwrap(json["output_config"] as? [String: Any])
+        XCTAssertEqual(outputConfig["effort"] as? String, "medium")
+    }
+
     func testContinuesAfterToolResultAndSendsFollowUpRequest() async throws {
         MockURLProtocol.enqueue(
             .init(
@@ -91,6 +127,12 @@ final class ClaudeClientTests: XCTestCase {
             JSONSerialization.jsonObject(with: secondBody) as? [String: Any]
         )
         let messages = try XCTUnwrap(json["messages"] as? [[String: Any]])
+        let assistantMessage = try XCTUnwrap(messages.dropLast().last)
+        let assistantContent = try XCTUnwrap(assistantMessage["content"] as? [[String: Any]])
+        XCTAssertEqual(assistantContent.map { $0["type"] as? String ?? "" }, ["thinking", "tool_use"])
+        XCTAssertEqual(assistantContent.first?["thinking"] as? String, "")
+        XCTAssertEqual(assistantContent.first?["signature"] as? String, "signature-1")
+
         let finalUserMessage = try XCTUnwrap(messages.last)
         let contentBlocks = try XCTUnwrap(finalUserMessage["content"] as? [[String: Any]])
         let toolResultBlock = try XCTUnwrap(
@@ -106,13 +148,19 @@ final class ClaudeClientTests: XCTestCase {
             #"event: message_start"#,
             #"data: {"type":"message_start"}"#,
             #"event: content_block_start"#,
-            #"data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-1","name":"update_meal_log","input":{}}}"#,
+            #"data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}"#,
             #"event: content_block_delta"#,
-            #"data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"description\":\"Chicken\""}} "#,
-            #"event: content_block_delta"#,
-            #"data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":",\"estimated_calories\":300,\"estimated_protein_grams\":50}"}}"#,
+            #"data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"signature-1"}}"#,
             #"event: content_block_stop"#,
             #"data: {"type":"content_block_stop","index":0}"#,
+            #"event: content_block_start"#,
+            #"data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tool-1","name":"update_meal_log","input":{}}}"#,
+            #"event: content_block_delta"#,
+            #"data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"description\":\"Chicken\""}} "#,
+            #"event: content_block_delta"#,
+            #"data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":",\"estimated_calories\":300,\"estimated_protein_grams\":50}"}}"#,
+            #"event: content_block_stop"#,
+            #"data: {"type":"content_block_stop","index":1}"#,
             #"event: message_delta"#,
             #"data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}"#,
             #"event: message_stop"#,
