@@ -16,7 +16,7 @@ final class HierarchicalMemoryPipelineTests: XCTestCase {
         let client = StubStreamingClient(
             scripts: [
                 .events([
-                    .toolUseStart(id: "profile", name: "update_profile"),
+                    .toolUseStart(id: "profile", name: "update_identity_fact"),
                     .toolUseDelta(id: "profile", partialJSON: #"{"key":"goal_weight","value":"78kg"}"#),
                     .toolUseEnd(id: "profile"),
                     .messageStop

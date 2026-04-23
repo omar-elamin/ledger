@@ -84,7 +84,7 @@ final class ChatViewModelTests: XCTestCase {
                     .toolUseStart(id: "metric", name: "update_metric"),
                     .toolUseDelta(id: "metric", partialJSON: #"{"type":"sleep","value":"7h 10m","context":"solid"}"#),
                     .toolUseEnd(id: "metric"),
-                    .toolUseStart(id: "profile", name: "update_profile"),
+                    .toolUseStart(id: "profile", name: "update_identity_fact"),
                     .toolUseDelta(id: "profile", partialJSON: #"{"key":"goal","value":"cut"}"#),
                     .toolUseEnd(id: "profile"),
                     .textDelta("Logged."),
@@ -129,13 +129,13 @@ final class ChatViewModelTests: XCTestCase {
         let client = StubStreamingClient(
             scripts: [
                 .events([
-                    .toolUseStart(id: "profile-1", name: "update_profile"),
+                    .toolUseStart(id: "profile-1", name: "update_identity_fact"),
                     .toolUseDelta(id: "profile-1", partialJSON: #"{"key":"goal","value":"cut"}"#),
                     .toolUseEnd(id: "profile-1"),
                     .messageStop
                 ]),
                 .events([
-                    .toolUseStart(id: "profile-2", name: "update_profile"),
+                    .toolUseStart(id: "profile-2", name: "update_identity_fact"),
                     .toolUseDelta(id: "profile-2", partialJSON: #"{"key":"goal","value":"maintain"}"#),
                     .toolUseEnd(id: "profile-2"),
                     .messageStop

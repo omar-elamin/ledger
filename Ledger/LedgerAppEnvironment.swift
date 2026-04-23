@@ -394,7 +394,7 @@ private actor ScriptedCoachClient: CoachStreamingClient {
     ) async throws {
         let toolID = "ui-test-profile-log"
         let value = latestUserText.contains("78") ? "78kg" : "80kg"
-        continuation.yield(.toolUseStart(id: toolID, name: "update_profile"))
+        continuation.yield(.toolUseStart(id: toolID, name: "update_identity_fact"))
         continuation.yield(
             .toolUseDelta(
                 id: toolID,

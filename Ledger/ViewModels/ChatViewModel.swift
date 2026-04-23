@@ -208,10 +208,10 @@ final class ChatViewModel {
             )
             try modelContext.save()
             return "Metric logged."
-        case "update_profile":
+        case "update_identity_fact":
             let payload = try decoder.decode(UpdateProfilePayload.self, from: data)
             try upsertProfileEntry(payload, in: modelContext)
-            return "Profile updated."
+            return "Identity fact stored."
         case "search_archive":
             let payload = try decoder.decode(SearchArchivePayload.self, from: data)
             return try ContextBuilder(

@@ -100,18 +100,20 @@ enum CoachTools {
             eagerInputStreaming: true
         ),
         Tool(
-            name: "update_profile",
-            description: "Persist something the user revealed about themselves — a goal, constraint, preference, pattern. Only call for things worth remembering permanently.",
+            name: "update_identity_fact",
+            description: "Persist something about this person's identity — not just numeric facts but the way they frame their goal, the constraints they operate under, the approaches they've tried. Use this whenever you learn something that would change how you'd respond to them in the future.",
             inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
                     "key": .object([
                         "type": .string("string"),
-                        "description": .string("Short identifier, e.g. 'goal_weight', 'dietary_constraint', 'preferred_training_time'")
+                        "description": .string("""
+                        Short snake_case identifier. Atomic facts: name, age, height, current_weight, goal_weight, calorie_target, protein_target, goal_start_date. Framings (values can be multi-sentence): goal_framing (their language for their goal), origin_story (how they got to their current state), approach (their stated method). Constraints and preferences: constraint (dietary, medical, or practical limit), ruled_out (approach they've tried and won't repeat), preference (a stated preference worth honoring).
+                        """)
                     ]),
                     "value": .object([
                         "type": .string("string"),
-                        "description": .string("The value to remember")
+                        "description": .string("The fact, framing, or constraint to store. For framings, preserve the user's own language — do not paraphrase. Values for framing, constraint, ruled_out, and preference keys can be multi-sentence.")
                     ])
                 ]),
                 "required": .array([
