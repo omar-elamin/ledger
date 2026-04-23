@@ -174,6 +174,51 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertFalse(profiles.first?.markdownContent.contains("- goal: cut") == true)
     }
 
+    func testPrefixesOutgoingMessagesWithTimestamps() async throws {
+        let container = try TestHelpers.makeInMemoryContainer()
+        let context = ModelContext(container)
+        let client = StubStreamingClient(
+            scripts: [.events([.textDelta("ok"), .messageStop])]
+        )
+        let viewModel = ChatViewModel(
+            claudeClient: client,
+            now: { Date(timeIntervalSince1970: 1_700_000_000) }
+        )
+        viewModel.loadInitialMessages(from: context)
+
+        viewModel.send("hello", modelContext: context)
+        await waitUntil {
+            viewModel.messages.count == 3 && !viewModel.isStreaming
+        }
+
+        let invocations = await client.invocationsSnapshot()
+        let invocation = try XCTUnwrap(invocations.first)
+        XCTAssertFalse(invocation.messages.isEmpty)
+        for message in invocation.messages {
+            XCTAssertTrue(
+                message.content.hasPrefix("["),
+                "expected timestamp prefix, got \(message.content)"
+            )
+            XCTAssertTrue(
+                message.content.contains("] "),
+                "expected '] ' after timestamp, got \(message.content)"
+            )
+        }
+
+        let userMessage = try XCTUnwrap(invocation.messages.last)
+        XCTAssertTrue(
+            userMessage.content.hasSuffix("hello"),
+            "user content should follow the prefix, got \(userMessage.content)"
+        )
+
+        // Stored content stays plain for the chat UI — prefix is LLM-only.
+        let stored = try TestHelpers.fetchMessages(from: context)
+        XCTAssertTrue(
+            stored.contains(where: { $0.content == "hello" }),
+            "expected the original 'hello' content in storage without a timestamp prefix"
+        )
+    }
+
     func testAppendsFallbackWhenStreamingFails() async throws {
         let container = try TestHelpers.makeInMemoryContainer()
         let context = ModelContext(container)

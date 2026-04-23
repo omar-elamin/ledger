@@ -74,6 +74,15 @@ actor MemoryMaintainer {
     into a cut..."). Never write a name you did not receive. Fabricating
     a name corrupts the situational brief the coach reads on every turn.
 
+    ## Dating events in prose
+
+    When your prose references a specific dated event — a workout, a weight
+    reading, an HRV crash, a conversation day — use the absolute date
+    ("Apr 20") or window-relative phrasing ("over the past week," "this
+    week's training"). Do not use "yesterday," "two days ago," "last
+    Tuesday," or other anchors that decay. This snapshot may be read a day
+    or more after it was generated; relative anchors drift.
+
     ## Output
 
     Return only the brief prose. No headers, no labels, no preamble.
@@ -425,7 +434,13 @@ actor MemoryMaintainer {
         let enrichment = computeDailyEnrichment(
             identityFacts: identityFacts,
             today: structured,
-            todayMessages: messages.map { ConversationSnippet(role: $0.role, content: $0.content) },
+            todayMessages: messages.map {
+                ConversationSnippet(
+                    role: $0.role,
+                    content: $0.content,
+                    date: Self.timestampString($0.timestamp)
+                )
+            },
             baselineStats: baselineStats,
             priorWorkouts: priorWorkouts,
             priorMetrics: priorHRVMetrics
@@ -438,7 +453,8 @@ actor MemoryMaintainer {
             messages: messages.map {
                 ConversationSnippet(
                     role: $0.role,
-                    content: $0.content
+                    content: $0.content,
+                    date: Self.timestampString($0.timestamp)
                 )
             },
             preComputedContext: enrichment
@@ -1758,6 +1774,7 @@ private struct WorkingWeightSnapshot: Encodable, Equatable {
 private struct ConversationSnippet: Encodable {
     let role: String
     let content: String
+    let date: String
 }
 
 private struct SummarySnapshot: Encodable {

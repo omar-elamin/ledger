@@ -143,6 +143,51 @@ final class MemoryMaintainerTests: XCTestCase {
         XCTAssertTrue(prompt.contains("behavioral, not personal."))
     }
 
+    func testSummarizeTodayPayloadCarriesMessageTimestamps() async throws {
+        let container = try TestHelpers.makeInMemoryContainer()
+        let context = ModelContext(container)
+        let now = Date(timeIntervalSince1970: 1_777_777_200)
+        let calendar = Calendar(identifier: .gregorian)
+        let today = calendar.startOfDay(for: now)
+        let morning = calendar.date(byAdding: .hour, value: 8, to: today) ?? today
+
+        context.insert(
+            StoredMessage(
+                role: "user",
+                content: "morning weigh-in 82.1kg",
+                timestamp: morning
+            )
+        )
+        try context.save()
+
+        let generator = StubMemoryTextGenerator(responses: ["summary"])
+        let maintainer = MemoryMaintainer(
+            modelContainer: container,
+            textGenerator: generator,
+            calendar: calendar,
+            now: { now }
+        )
+
+        try await maintainer.summarizeToday()
+
+        let prompts = await generator.promptsSnapshot()
+        let payload = try XCTUnwrap(prompts.first?.userPrompt)
+        XCTAssertTrue(
+            payload.contains("\"date\""),
+            "expected ConversationSnippet.date field in payload; got \(payload)"
+        )
+        XCTAssertTrue(
+            payload.contains("morning weigh-in 82.1kg"),
+            "expected user-message content in payload"
+        )
+    }
+
+    func testActiveStateSystemPromptDatesEventsAbsolutely() {
+        let prompt = MemoryMaintainer.activeStateSystemPrompt
+        XCTAssertTrue(prompt.contains("## Dating events in prose"))
+        XCTAssertTrue(prompt.contains(#"Do not use "yesterday,""#))
+    }
+
     func testSummarizeTodayUpsertsSingleDailySummary() async throws {
         let container = try TestHelpers.makeInMemoryContainer()
         let context = ModelContext(container)

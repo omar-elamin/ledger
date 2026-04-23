@@ -96,7 +96,7 @@ final class ChatViewModel {
 
         do {
             let stream = await claudeClient.streamMessage(
-                messages: messages,
+                messages: messages.map(Self.timestampPrefixed),
                 contextBlock: contextBlock,
                 tools: CoachTools.all
             )
@@ -327,6 +327,22 @@ final class ChatViewModel {
         let message = Message(role: .coach, content: text, timestamp: now())
         persistAndAppend(message, in: modelContext)
     }
+
+    // Stored messages stay plain; the prefix is only context for the model.
+    private static func timestampPrefixed(_ message: Message) -> Message {
+        var copy = message
+        copy.content = "[\(messageTimestampFormatter.string(from: message.timestamp))] \(message.content)"
+        return copy
+    }
+
+    private static let messageTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = .autoupdatingCurrent
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.dateFormat = "MMM d, HH:mm"
+        return formatter
+    }()
 
     private func persistAndAppend(_ message: Message, in modelContext: ModelContext) {
         do {
