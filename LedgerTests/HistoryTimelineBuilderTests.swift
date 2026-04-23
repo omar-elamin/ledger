@@ -84,6 +84,54 @@ final class HistoryTimelineBuilderTests: XCTestCase {
         XCTAssertTrue(weeks.isEmpty)
     }
 
+    func testAttachesNarrativeProviderOutputToMatchingWeek() {
+        let calendar = makeCalendar()
+        let anchorDate = date("2026-04-22T12:00:00Z")
+
+        let meals = [
+            StoredMeal(date: date("2026-04-22T09:00:00Z"), descriptionText: "Chicken", calories: 300, protein: 50),
+            StoredMeal(date: date("2026-04-14T09:00:00Z"), descriptionText: "Yogurt", calories: 200, protein: 20)
+        ]
+
+        let currentWeekStart = calendar.dateInterval(of: .weekOfYear, for: anchorDate)!.start
+        let previousWeekStart = calendar.date(byAdding: .weekOfYear, value: -1, to: currentWeekStart)!
+
+        var seenWeekStarts: [Date] = []
+        let weeks = HistoryTimelineBuilder.build(
+            meals: meals,
+            workoutSets: [],
+            metrics: [],
+            anchorDate: anchorDate,
+            calendar: calendar,
+            narrativeProvider: { weekStart in
+                seenWeekStarts.append(weekStart)
+                if weekStart == currentWeekStart { return "this week narrative" }
+                if weekStart == previousWeekStart { return "last week narrative" }
+                return nil
+            }
+        )
+
+        XCTAssertEqual(weeks.count, 2)
+        XCTAssertEqual(weeks[0].narrative, "this week narrative")
+        XCTAssertEqual(weeks[1].narrative, "last week narrative")
+        XCTAssertEqual(Set(seenWeekStarts), Set([currentWeekStart, previousWeekStart]))
+    }
+
+    func testDefaultBuildHasNilNarrative() {
+        let calendar = makeCalendar()
+        let anchorDate = date("2026-04-22T12:00:00Z")
+        let weeks = HistoryTimelineBuilder.build(
+            meals: [
+                StoredMeal(date: date("2026-04-22T09:00:00Z"), descriptionText: "Chicken", calories: 300, protein: 50)
+            ],
+            workoutSets: [],
+            metrics: [],
+            anchorDate: anchorDate,
+            calendar: calendar
+        )
+        XCTAssertNil(weeks.first?.narrative)
+    }
+
     private func makeCalendar() -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

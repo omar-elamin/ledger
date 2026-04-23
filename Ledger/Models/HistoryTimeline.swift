@@ -13,6 +13,7 @@ struct HistoryDaySnapshot: Identifiable {
 struct HistoryWeekSection: Identifiable {
     let startDate: Date
     let label: String
+    let narrative: String?
     let days: [HistoryDaySnapshot]
 
     var id: Date { startDate }
@@ -64,7 +65,8 @@ enum HistoryTimelineBuilder {
         workoutSets: [StoredWorkoutSet],
         metrics: [StoredMetric],
         anchorDate: Date,
-        calendar: Calendar = .autoupdatingCurrent
+        calendar: Calendar = .autoupdatingCurrent,
+        narrativeProvider: (Date) -> String? = { _ in nil }
     ) -> [HistoryWeekSection] {
         var dayBuckets: [Date: DayBucket] = [:]
 
@@ -122,6 +124,7 @@ enum HistoryTimelineBuilder {
                         anchorDate: anchorDate,
                         calendar: calendar
                     ),
+                    narrative: narrativeProvider(weekStart),
                     days: groupedByWeek[weekStart, default: []]
                         .sorted { $0.date > $1.date }
                 )

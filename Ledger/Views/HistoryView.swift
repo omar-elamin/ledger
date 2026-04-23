@@ -12,24 +12,46 @@ struct HistoryView: View {
     private var metrics: [StoredMetric]
 
     private var weeks: [HistoryWeekSection] {
-        HistoryTimelineBuilder.build(
+        let anchor = dayAnchorController.dayAnchor
+        let built = HistoryTimelineBuilder.build(
             meals: meals,
             workoutSets: workoutSets,
             metrics: metrics,
-            anchorDate: dayAnchorController.dayAnchor
+            anchorDate: anchor,
+            narrativeProvider: { weekStart in
+                MockHistoryNarratives.narrative(
+                    forWeekStartingOn: weekStart,
+                    anchorDate: anchor
+                )
+            }
         )
+
+        // Stub narrative for the just-getting-started case: only the current
+        // week exists and it's sparse.
+        if built.count == 1, built[0].days.count < 3 {
+            let only = built[0]
+            return [
+                HistoryWeekSection(
+                    startDate: only.startDate,
+                    label: only.label,
+                    narrative: MockHistoryNarratives.justGettingStarted,
+                    days: only.days
+                )
+            ]
+        }
+        return built
     }
 
     var body: some View {
         ZStack {
             if weeks.isEmpty {
-                VStack(spacing: 10) {
-                    Text("No history yet.")
-                        .font(Typography.serifBody(17))
-                        .foregroundStyle(Color.ledgerTextSecondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityIdentifier("history.emptyState")
+                Text("Your history will appear here as the days accumulate.")
+                    .font(Typography.serifBody(17))
+                    .foregroundStyle(Color.ledgerTextTertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityIdentifier("history.emptyState")
             } else {
                 ScrollView {
                     weeksStack
@@ -45,43 +67,44 @@ struct HistoryView: View {
     }
 
     private var weeksStack: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            ForEach(Array(weeks.enumerated()), id: \.element.id) { index, week in
-                if index > 0 {
-                    Rectangle()
-                        .fill(Color.ledgerHairline)
-                        .frame(height: 1)
-                        .padding(.top, 4)
-                }
+        VStack(alignment: .leading, spacing: 40) {
+            ForEach(weeks) { week in
+                weekBlock(week)
+            }
+            Spacer(minLength: 0)
+        }
+    }
 
-                VStack(alignment: .leading, spacing: 20) {
-                    Text(week.label)
-                        .smallCapsLabel(size: 12)
-                        .padding(.bottom, 2)
+    private func weekBlock(_ week: HistoryWeekSection) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(week.label.uppercased())
+                .smallCapsLabel(size: 12)
+                .accessibilityIdentifier(weekHeaderIdentifier(for: week.startDate))
 
-                    VStack(alignment: .leading, spacing: 22) {
-                        ForEach(week.days) { day in
-                            Button(action: {}) {
-                                dayRow(day)
-                            }
-                            .buttonStyle(PressableRowStyle())
-                            .accessibilityElement(children: .contain)
-                            .accessibilityIdentifier(dayRowIdentifier(for: day.date))
-                        }
-                    }
-                }
+            if let narrative = week.narrative {
+                Text(narrative)
+                    .font(Typography.serifBody(18))
+                    .foregroundStyle(Color.ledgerTextPrimary)
+                    .lineSpacing(6)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier(weekNarrativeIdentifier(for: week.startDate))
             }
 
-            Spacer(minLength: 40)
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(week.days) { day in
+                    dayRow(day)
+                }
+            }
         }
     }
 
     private func dayRow(_ day: HistoryDaySnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(day.dayLabel)
                     .font(Typography.roundedNumber(17, weight: .medium))
-                    .foregroundStyle(Color.ledgerTextPrimary)
+                    .foregroundStyle(Color.ledgerTextSecondary)
                     .accessibilityIdentifier(dayDayLabelIdentifier(for: day.date))
                 Text("\(LedgerFormat.number(day.calories))c · \(LedgerFormat.number(day.protein))p")
                     .font(Typography.roundedNumber(14))
@@ -91,7 +114,7 @@ struct HistoryView: View {
             }
             Text(day.summary)
                 .font(Typography.serifBody(15))
-                .foregroundStyle(Color.ledgerTextSecondary)
+                .foregroundStyle(Color.ledgerTextTertiary)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier(daySummaryIdentifier(for: day.date))
@@ -101,23 +124,35 @@ struct HistoryView: View {
     }
 
     private func dayRowIdentifier(for date: Date) -> String {
+        "history.dayRow.\(rowDateKey(for: date))"
+    }
+
+    private func dayTotalsIdentifier(for date: Date) -> String {
+        "history.dayTotals.\(rowDateKey(for: date))"
+    }
+
+    private func daySummaryIdentifier(for date: Date) -> String {
+        "history.daySummary.\(rowDateKey(for: date))"
+    }
+
+    private func dayDayLabelIdentifier(for date: Date) -> String {
+        "history.dayLabel.\(rowDateKey(for: date))"
+    }
+
+    private func weekHeaderIdentifier(for date: Date) -> String {
+        "history.week.\(rowDateKey(for: date)).header"
+    }
+
+    private func weekNarrativeIdentifier(for date: Date) -> String {
+        "history.week.\(rowDateKey(for: date)).narrative"
+    }
+
+    private func rowDateKey(for date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = .autoupdatingCurrent
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = .autoupdatingCurrent
         formatter.dateFormat = "yyyy-MM-dd"
-        return "history.dayRow.\(formatter.string(from: date))"
-    }
-
-    private func dayTotalsIdentifier(for date: Date) -> String {
-        dayRowIdentifier(for: date).replacingOccurrences(of: "dayRow", with: "dayTotals")
-    }
-
-    private func daySummaryIdentifier(for date: Date) -> String {
-        dayRowIdentifier(for: date).replacingOccurrences(of: "dayRow", with: "daySummary")
-    }
-
-    private func dayDayLabelIdentifier(for date: Date) -> String {
-        dayRowIdentifier(for: date).replacingOccurrences(of: "dayRow", with: "dayLabel")
+        return formatter.string(from: date)
     }
 }
